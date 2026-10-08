@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data: keep the folder, ignore contents
+data/*
+!data/.gitkeep
+
+# ML artifacts
+mlruns/
+mlartifacts/
+*.joblib
+*.pkl
+
+# Testing and tooling
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
