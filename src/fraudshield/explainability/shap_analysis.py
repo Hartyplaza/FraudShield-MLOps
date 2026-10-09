@@ -11,7 +11,6 @@ Two functions:
 import logging
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -45,6 +44,7 @@ def global_importance(model,
         out_dir: directory to save plots
     """
     import shap
+    import matplotlib.pyplot as plt
 
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     classifier  = _get_classifier(model)
