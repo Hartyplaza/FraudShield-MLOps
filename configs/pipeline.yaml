@@ -1,0 +1,17 @@
+generator:
+  profile: assessment
+  seed: 42
+  n_rows: 10000
+  n_users: 86
+  start: "2025-06-01"
+  days: 60
+  null_rate: 0.112
+  malformed_rate: 0.110
+  location_missing_rate: 0.125
+  device_missing_rate: 0.139
+  amount_min: 1.0
+  amount_max: 5000.0
+  txn_types: [cashout, debit, deposit, purchase, refund, top-up, transfer, withdrawal]
+  locations: [Birmingham, Cardiff, Glasgow, Leeds, Liverpool, London, Manchester]
+  devices: [Huawei P30, iPhone 13, Nokia 3310, Pixel 6, Samsung Galaxy S10, Xiaomi Mi 11]
+  currencies: ["€", "£", "$"]
