@@ -58,14 +58,14 @@ def _build_pipelines() -> dict:
         ("model",  LogisticRegression(max_iter=1000, random_state=RANDOM_SEED)),
     ])
     lr_params = {
-        "model__C"      : uniform(0.001, 10),
-        "model__penalty": ["l1", "l2"],
-        "model__solver" : ["liblinear"],
+        "model__C"       : uniform(0.001, 10),
+        "model__l1_ratio": [0, 1],          # 0 = L2, 1 = L1 (penalty= is deprecated)
+        "model__solver"  : ["liblinear"],
     }
 
     rf_pipeline = ImbPipeline([
         ("smote", SMOTE(random_state=RANDOM_SEED)),
-        ("model", RandomForestClassifier(random_state=RANDOM_SEED, n_jobs=-1)),
+        ("model", RandomForestClassifier(random_state=RANDOM_SEED, n_jobs=1)),
     ])
     rf_params = {
         "model__n_estimators"     : randint(100, 500),
@@ -95,7 +95,7 @@ def _build_pipelines() -> dict:
     lgbm_pipeline = ImbPipeline([
         ("smote", SMOTE(random_state=RANDOM_SEED)),
         ("model", lgb.LGBMClassifier(
-            random_state=RANDOM_SEED, verbosity=-1, n_jobs=-1,
+            random_state=RANDOM_SEED, verbosity=-1, n_jobs=1,
         )),
     ])
     lgbm_params = {
