@@ -22,6 +22,8 @@ mlruns/
 mlartifacts/
 *.joblib
 *.pkl
+models/
+reports/
 
 # Testing and tooling
 .pytest_cache/

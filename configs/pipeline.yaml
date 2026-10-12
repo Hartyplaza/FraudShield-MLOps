@@ -15,3 +15,12 @@ generator:
   locations: [Birmingham, Cardiff, Glasgow, Leeds, Liverpool, London, Manchester]
   devices: [Huawei P30, iPhone 13, Nokia 3310, Pixel 6, Samsung Galaxy S10, Xiaomi Mi 11]
   currencies: ["€", "£", "$"]
+
+
+paths:
+  raw: data/raw/logs.csv
+  clean: data/interim/clean.csv
+  labelled: data/interim/labelled.csv
+  features: data/processed/features.csv
+  model_dir: models
+  metrics: reports/metrics.json
