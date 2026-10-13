@@ -171,6 +171,7 @@ dependencies = [
 [package.optional-dependencies]
 serve = [
     { name = "fastapi" },
+    { name = "imbalanced-learn" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "shap" },
@@ -194,6 +195,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.143.0" },
+    { name = "imbalanced-learn", marker = "extra == 'serve'", specifier = ">=0.14.2" },
     { name = "imbalanced-learn", marker = "extra == 'train'", specifier = ">=0.14.2" },
     { name = "joblib", specifier = ">=1.6.0" },
     { name = "lightgbm", specifier = ">=4.7.0" },
