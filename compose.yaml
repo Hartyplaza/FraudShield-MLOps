@@ -1,0 +1,31 @@
+# docker compose up
+#   1. train: runs the whole pipeline and writes the model to the 'models' volume
+#   2. api:   starts only after train succeeds, and serves that model read-only
+services:
+  train:
+    build:
+      context: .
+      target: train
+    image: fraudshield-train:latest
+    volumes:
+      - models:/app/models
+      - reports:/app/reports
+
+  api:
+    build:
+      context: .
+      target: serve
+    image: fraudshield-serve:latest
+    depends_on:
+      train:
+        condition: service_completed_successfully
+    environment:
+      MODEL_DIR: /app/models
+    volumes:
+      - models:/app/models:ro
+    ports:
+      - "8000:8000"
+
+volumes:
+  models:
+  reports:
