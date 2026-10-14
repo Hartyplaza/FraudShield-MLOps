@@ -64,31 +64,27 @@ class FraudPredictor:
 
     def predict(self, X: pd.DataFrame) -> dict:
         """
-        Score a single transaction or batch of transactions.
+        Score one or more transactions.
+
+        Always returns lists, whatever the number of rows, so callers never
+        have to check whether they got a scalar or a list.
 
         Args:
             X: DataFrame with feature columns
 
         Returns:
-            dict with fraud_probability, is_fraud, and threshold_used
+            dict with fraud_probability (list), is_fraud (list), threshold_used
         """
         if not self._loaded:
             self.load()
 
         X_valid   = self._validate(X)
         probas    = self.model.predict_proba(X_valid)[:, 1]
-        is_fraud  = (probas >= self.threshold).astype(int)
-
-        if len(X_valid) == 1:
-            return {
-                "fraud_probability": round(float(probas[0]), 4),
-                "is_fraud"         : bool(is_fraud[0]),
-                "threshold_used"   : self.threshold,
-            }
+        is_fraud  = probas >= self.threshold
 
         return {
             "fraud_probability": [round(float(p), 4) for p in probas],
-            "is_fraud"         : is_fraud.tolist(),
+            "is_fraud"         : [bool(f) for f in is_fraud],
             "threshold_used"   : self.threshold,
         }
 
@@ -110,7 +106,12 @@ class FraudPredictor:
             self.load()
 
         X_valid = self._validate(X)
-        result  = self.predict(X_valid)
+        batch   = self.predict(X_valid)
+        result  = {
+            "fraud_probability": batch["fraud_probability"][0],
+            "is_fraud"         : batch["is_fraud"][0],
+            "threshold_used"   : batch["threshold_used"],
+        }
 
         shap_vals = explain_prediction(self.model, X_valid)
         result["top_features"] = top_contributors(shap_vals, n=5)
