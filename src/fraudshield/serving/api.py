@@ -7,6 +7,7 @@ Endpoints:
     GET  /health    — liveness check + model status
     POST /predict   — score a single transaction with SHAP explanation
     POST /predict/batch — score multiple transactions
+    POST /score     — score one raw log line using each user's history
 
 Run locally:
     uvicorn fraudshield.serving.api:app --host 0.0.0.0 --port 8000 --reload
@@ -18,9 +19,11 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 from fraudshield.serving.predictor import FraudPredictor
 from fraudshield.serving.schema import FraudResponse, HealthResponse, TransactionRequest
+from fraudshield.serving.scorer import RawScorer, UnparseableLog
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -39,16 +42,28 @@ app       = FastAPI(
 
 # Single predictor instance — loaded once on startup
 predictor = FraudPredictor(model_dir=MODEL_DIR)
+scorer: RawScorer | None = None
+
+
+class RawLog(BaseModel):
+    log: str
 
 
 @app.on_event("startup")
 def load_model():
     """Load model artefacts when the API starts."""
+    global scorer
+    scorer = None
     try:
         predictor.load()
         logger.info("Model loaded successfully.")
     except FileNotFoundError as e:
         logger.warning("Model not loaded: %s", e)
+        return
+    try:
+        scorer = RawScorer.from_model_dir(predictor, predictor.model_dir)
+    except FileNotFoundError as e:
+        logger.warning("Raw-log scoring disabled, feature state missing: %s", e)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -124,3 +139,22 @@ def predict_batch(transactions: list[TransactionRequest]):
             for i in range(len(transactions))
         ],
     }
+
+
+@app.post("/score")
+def score(body: RawLog):
+    """
+    Score one raw transaction log line, in any of the 7 supported formats.
+
+    Features are computed from this user's history up to now, and the
+    transaction is then added to that history.
+    """
+    if scorer is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Raw-log scoring unavailable: model or feature state not loaded."
+        )
+    try:
+        return scorer.score(body.log)
+    except UnparseableLog as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
