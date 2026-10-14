@@ -111,10 +111,10 @@ model, not a claim about real-world fraud performance.
 | Milestone | Focus | Status |
 |---|---|---|
 | M1 | Reproducible build: packaging, generator, pipeline, Docker, tests | ✅ Done |
-| M2 | Experiment tracking and data versioning (MLflow, DVC) | Next |
-| M3 | Data validation and ML-specific tests | |
-| M4 | Model registry and promotion gates | |
-| M5 | Serving: batch vs real-time, load testing | |
+| M2 | Real-time scoring: online features, leak-free training, `/score` | ✅ Done |
+| M3 | Experiment tracking and data versioning (MLflow, DVC) | Next |
+| M4 | Data validation and ML-specific tests | |
+| M5 | Model registry and promotion gates | |
 | M6 | CI/CD and cloud deployment | |
 | M7 | Monitoring and drift detection | |
 | M8 | Automated retraining | |
