@@ -14,8 +14,8 @@ Feature groups:
 """
 
 import logging
+
 import pandas as pd
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ def add_amount_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_velocity_features(df: pd.DataFrame,
-                           windows: list = None) -> pd.DataFrame:
+                           windows: list | None = None) -> pd.DataFrame:
     """
     Per-user rolling transaction count and sum over time windows.
 
@@ -122,13 +122,13 @@ def add_velocity_features(df: pd.DataFrame,
 
     for window in windows:
         label = window.lower()
-        df["txn_count_{}".format(label)] = (
+        df[f"txn_count_{label}"] = (
             df.groupby("user_id")["amount"]
-              .transform(lambda x: x.rolling(window, min_periods=1).count())
+              .transform(lambda x, w=window: x.rolling(w, min_periods=1).count())
         )
-        df["txn_sum_{}".format(label)] = (
+        df[f"txn_sum_{label}"] = (
             df.groupby("user_id")["amount"]
-              .transform(lambda x: x.rolling(window, min_periods=1).sum())
+              .transform(lambda x, w=window: x.rolling(w, min_periods=1).sum())
         )
 
     df = df.reset_index()

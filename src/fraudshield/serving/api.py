@@ -12,14 +12,15 @@ Run locally:
     uvicorn fraudshield.serving.api:app --host 0.0.0.0 --port 8000 --reload
 """
 
-import os
 import logging
-import pandas as pd
-from fastapi import FastAPI, HTTPException
-from dotenv import load_dotenv
+import os
 
-from fraudshield.serving.schema import TransactionRequest, FraudResponse, HealthResponse
+import pandas as pd
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+
 from fraudshield.serving.predictor import FraudPredictor
+from fraudshield.serving.schema import FraudResponse, HealthResponse, TransactionRequest
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
