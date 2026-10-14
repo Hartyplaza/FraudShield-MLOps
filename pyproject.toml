@@ -33,6 +33,10 @@ train = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.ruff.lint.per-file-ignores]
+# Log timestamps are naive local times by design; tests mirror that.
+"tests/*" = ["DTZ"]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",

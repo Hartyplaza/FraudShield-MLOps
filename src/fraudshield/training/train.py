@@ -13,30 +13,30 @@ Training pipeline:
 import json
 import logging
 import time
+from pathlib import Path
+
 import joblib
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import yaml
-from pathlib import Path
+import xgboost.core as xgb_core
+from imblearn.over_sampling import ADASYN, SMOTE
+from imblearn.pipeline import Pipeline as ImbPipeline
 from scipy.stats import randint, uniform
-
-import lightgbm as lgb
-from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import average_precision_score
 from sklearn.model_selection import (
-    train_test_split,
     RandomizedSearchCV,
     StratifiedKFold,
+    train_test_split,
 )
-from sklearn.metrics import average_precision_score
-from imblearn.over_sampling import SMOTE, ADASYN
-from imblearn.pipeline import Pipeline as ImbPipeline
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
-from fraudshield.features.engineer import FEATURE_COLS
 from fraudshield.evaluation.metrics import evaluate
 from fraudshield.evaluation.threshold_tuner import tune_threshold
+from fraudshield.features.engineer import FEATURE_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,8 @@ def _search_xgboost(pipeline, param_space, X_train, y_train, cv) -> tuple:
                 score = average_precision_score(y_train.iloc[val_idx], proba)
                 if not np.isnan(score):
                     fold_scores.append(score)
-            except Exception:
+            except (ValueError, xgb_core.XGBoostError) as exc:
+                logger.warning("XGBoost fold failed for %s: %s", params, exc)
                 break
 
         if len(fold_scores) == CV_FOLDS:

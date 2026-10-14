@@ -101,3 +101,12 @@ build down to 5.5 minutes, pointing to the bridge network as the bottleneck.
   class-based `Config` (use `ConfigDict`), Starlette `httpx` test client.
 - **Every pipeline stage depends on the whole config file**, so any config change
   reruns everything. To be addressed with DVC parameter tracking in M2.
+  - **The API cannot score a raw log line.** Category encodings are recomputed from
+  whatever data is present (not saved with the model), and velocity/user features
+  need per-user history. Scoring one line alone yields different features than
+  training (training/serving skew). Planned: persist encoders (M3), feature store
+  and raw-log endpoint (M5).
+  - **The API cannot score a raw log line**: category codes are recomputed per batch and
+  history features need per-user state (training/serving skew). Being fixed in M2.
+- **Batch scoring of a CSV depends on what else is in the file**, because features are
+  computed within the file. Being fixed in M2.

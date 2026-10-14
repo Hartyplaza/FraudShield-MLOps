@@ -7,10 +7,10 @@ Used by the FastAPI app and for batch scoring.
 
 import json
 import logging
-import joblib
-import numpy as np
-import pandas as pd
 from pathlib import Path
+
+import joblib
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class FraudPredictor:
 
         if not model_path.exists():
             raise FileNotFoundError(
-                "Model not found at {}. Run training first.".format(model_path))
+                f"Model not found at {model_path}. Run training first.")
 
         self.model        = joblib.load(model_path)
         self.threshold    = float(threshold_path.read_text().strip())
@@ -99,7 +99,8 @@ class FraudPredictor:
             predict() result plus top_features dict
         """
         from fraudshield.explainability.shap_analysis import (
-            explain_prediction, top_contributors
+            explain_prediction,
+            top_contributors,
         )
 
         if not self._loaded:

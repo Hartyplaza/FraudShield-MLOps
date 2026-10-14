@@ -5,10 +5,10 @@ Parses raw multi-format transaction log lines into structured records.
 Supports 7 distinct log schemas via regex pattern dispatch.
 """
 
-import re
 import logging
+import re
+
 import pandas as pd
-from typing import Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -102,7 +102,7 @@ PATTERNS = {
 NONE_PLACEHOLDERS = {"none", "null", "n/a", "na", "-", ""}
 
 
-def _normalise_timestamp(match: re.Match, fmt_name: str) -> Optional[str]:
+def _normalise_timestamp(match: re.Match, fmt_name: str) -> str | None:
     """
     All formats except dmy_triple_colon store timestamp as a single group.
     dmy_triple_colon splits day/month/year/time into 4 groups — we reassemble.
@@ -115,7 +115,7 @@ def _normalise_timestamp(match: re.Match, fmt_name: str) -> Optional[str]:
     return match.group("timestamp")
 
 
-def _clean_field(value: Optional[str]) -> Optional[str]:
+def _clean_field(value: str | None) -> str | None:
     """Return None for any known missing-value placeholder, else strip whitespace."""
     if value is None:
         return None
@@ -125,7 +125,7 @@ def _clean_field(value: Optional[str]) -> Optional[str]:
     return stripped
 
 
-def parse_log_line(raw) -> Optional[dict]:
+def parse_log_line(raw) -> dict | None:
     """
     Try every pattern against a single raw log string.
     Returns a dict of fields on success, None if the line cannot be parsed.

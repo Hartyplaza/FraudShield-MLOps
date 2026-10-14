@@ -5,8 +5,8 @@ Pydantic request and response schemas for the FraudShield V2 API.
 These define the exact contract between the API and its callers.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TransactionRequest(BaseModel):
@@ -58,8 +58,7 @@ class TransactionRequest(BaseModel):
     log_format_encoded : int = 0
     currency_encoded   : int = 0
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "hour"              : 2,
                 "day_of_week"       : 5,
@@ -90,7 +89,7 @@ class TransactionRequest(BaseModel):
                 "log_format_encoded": 2,
                 "currency_encoded"  : 1,
             }
-        }
+    })
 
 
 class FraudResponse(BaseModel):

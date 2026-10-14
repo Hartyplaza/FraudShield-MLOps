@@ -9,9 +9,9 @@ Two functions:
 """
 
 import logging
-import numpy as np
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,8 @@ def global_importance(model,
         X:       feature matrix (test or validation set)
         out_dir: directory to save plots
     """
-    import shap
     import matplotlib.pyplot as plt
+    import shap
 
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     classifier  = _get_classifier(model)
@@ -61,7 +61,7 @@ def global_importance(model,
     plt.figure(figsize=(10, 8))
     shap.summary_plot(sv, X, show=False)
     plt.tight_layout()
-    beeswarm_path = "{}/shap_summary.png".format(out_dir)
+    beeswarm_path = f"{out_dir}/shap_summary.png"
     plt.savefig(beeswarm_path, dpi=150)
     plt.close()
     logger.info("SHAP beeswarm saved -> %s", beeswarm_path)
@@ -70,7 +70,7 @@ def global_importance(model,
     plt.figure(figsize=(9, 8))
     shap.summary_plot(sv, X, plot_type="bar", show=False)
     plt.tight_layout()
-    bar_path = "{}/shap_bar.png".format(out_dir)
+    bar_path = f"{out_dir}/shap_bar.png"
     plt.savefig(bar_path, dpi=150)
     plt.close()
     logger.info("SHAP bar plot saved -> %s", bar_path)

@@ -6,15 +6,15 @@ Primary metric: PR-AUC (correct for imbalanced classification).
 """
 
 import logging
-import numpy as np
+
 import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
-    roc_auc_score,
+    confusion_matrix,
     f1_score,
     precision_score,
     recall_score,
-    confusion_matrix,
+    roc_auc_score,
 )
 
 logger = logging.getLogger(__name__)
