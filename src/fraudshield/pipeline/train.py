@@ -1,10 +1,16 @@
 """
 Stage 4: feature matrix -> trained model, threshold and test metrics.
 
+The encoders and feature state from stage 3 are copied next to the model, so
+models/ is a complete bundle: everything the API needs to score a raw
+transaction.
+
     uv run python -m fraudshield.pipeline.train
 """
 
 import json
+import shutil
+from pathlib import Path
 
 import pandas as pd
 
@@ -18,6 +24,10 @@ def main() -> None:
 
     df = pd.read_csv(paths["features"], parse_dates=["timestamp"])
     result = train(df, model_dir=paths["model_dir"])
+
+    model_dir = Path(paths["model_dir"])
+    shutil.copy(paths["encoders"], model_dir / "encoders.json")
+    shutil.copy(paths["feature_state"], model_dir / "feature_state.joblib")
 
     report = {
         "best_model": result["best_model"],

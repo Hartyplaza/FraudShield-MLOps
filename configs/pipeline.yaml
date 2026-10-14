@@ -22,5 +22,7 @@ paths:
   clean: data/interim/clean.csv
   labelled: data/interim/labelled.csv
   features: data/processed/features.csv
+  encoders: data/processed/encoders.json
+  feature_state: data/processed/feature_state.joblib
   model_dir: models
   metrics: reports/metrics.json
