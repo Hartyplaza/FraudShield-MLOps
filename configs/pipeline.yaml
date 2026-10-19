@@ -26,3 +26,8 @@ paths:
   feature_state: data/processed/feature_state.joblib
   model_dir: models
   metrics: reports/metrics.json
+
+tracking:
+  enabled: true
+  uri: sqlite:///mlflow.db
+  experiment: fraudshield
