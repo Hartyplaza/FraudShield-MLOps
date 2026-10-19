@@ -20,7 +20,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from fraudshield.features.engineer import FEATURE_COLS, HIGH_AMOUNT_THRESHOLD
+from fraudshield.features.engineer import (
+    FEATURE_COLS,
+    HIGH_AMOUNT_THRESHOLD,
+    RISKY_TYPES,
+)
 
 CATEGORICAL_COLS = ["txn_type", "location", "device", "log_format", "currency"]
 UNKNOWN = "unknown"
@@ -77,7 +81,7 @@ def _missing(value) -> bool:
 
 
 class FeatureState:
-    """Holds every user's history and turns one transaction into 28 features."""
+    """Holds every user's history and turns one transaction into 29 features."""
 
     def __init__(self, encoder: CategoryEncoder):
         self.encoder = encoder
@@ -132,6 +136,7 @@ class FeatureState:
             "amount": amount,
             "amount_z_score": z,
             "is_high_amount": int(amount >= HIGH_AMOUNT_THRESHOLD),
+            "is_risky_type": int(txn["txn_type"] in RISKY_TYPES),
             "amount_vs_user_max": amount / (s.max_amount or 1.0),
             "user_mean_amount": s.mean,
             "user_std_amount": std,
