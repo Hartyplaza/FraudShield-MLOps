@@ -81,7 +81,7 @@ def _missing(value) -> bool:
 
 
 class FeatureState:
-    """Holds every user's history and turns one transaction into 29 features."""
+    """Holds every user's history and turns one transaction into 27 features."""
 
     def __init__(self, encoder: CategoryEncoder):
         self.encoder = encoder

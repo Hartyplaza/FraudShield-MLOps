@@ -67,6 +67,9 @@ stages:
       - src/fraudshield/evaluation/threshold_tuner.py
       - src/fraudshield/pipeline/train.py
       - src/fraudshield/pipeline/config.py
+    params:
+      - configs/pipeline.yaml:
+          - training
     outs:
       - models
     metrics:
@@ -79,6 +82,7 @@ stages:
       - models
       - reports/metrics.json
       - configs/golden_cases.yaml
+      - configs/behaviour_cases.yaml
       - src/fraudshield/evaluation/gates.py
       - src/fraudshield/pipeline/gate.py
       - src/fraudshield/serving

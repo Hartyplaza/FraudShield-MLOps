@@ -1,9 +1,9 @@
 """
-Stage 5: quality gate. Checks the trained model against the metric limits and
-the golden cases; fails the pipeline if any check fails.
+Stage 5: quality gate. Checks the trained model against the metric limits, the
+golden cases and the behaviour checks; fails the pipeline if any check fails.
 
-Runs as its own stage, so changing a limit or a golden case re-checks the
-existing model without retraining it.
+Runs as its own stage, so changing a limit or a case re-checks the existing
+model without retraining it.
 
     uv run python -m fraudshield.pipeline.gate
 """
@@ -15,7 +15,9 @@ import yaml
 
 from fraudshield.evaluation.gates import (
     ModelQualityError,
+    check_directional,
     check_golden,
+    check_invariance,
     check_metrics,
     summarise,
 )
@@ -34,12 +36,21 @@ def main() -> None:
         metrics = json.load(f)
     with open(gates["golden_cases"], encoding="utf-8") as f:
         cases = yaml.safe_load(f)["cases"]
+    with open(gates["behaviour_cases"], encoding="utf-8") as f:
+        behaviour = yaml.safe_load(f)
+    for case in behaviour["invariance"] + behaviour["directional"]:
+        case.setdefault("history", behaviour["history"])
 
     predictor = FraudPredictor(paths["model_dir"])
     predictor.load()
     scorer = RawScorer.from_model_dir(predictor, paths["model_dir"])
 
-    results = check_metrics(metrics, gates["metrics"]) + check_golden(scorer, cases)
+    results = (
+        check_metrics(metrics, gates["metrics"])
+        + check_golden(scorer, cases)
+        + check_invariance(scorer, behaviour["invariance"], gates["invariance_tolerance"])
+        + check_directional(scorer, behaviour["directional"])
+    )
     failed = [r for r in results if not r["passed"]]
 
     report = {"passed": not failed, "checks": len(results), "failed": len(failed)}

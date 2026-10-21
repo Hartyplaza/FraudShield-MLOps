@@ -13,7 +13,7 @@ class TransactionRequest(BaseModel):
     """
     Input schema for a single transaction to be scored.
 
-    The 29 feature columns match FEATURE_COLS in src/fraudshield/features/engineer.py.
+    The 27 feature columns match FEATURE_COLS in src/fraudshield/features/engineer.py.
     Temporal and behavioural features should be pre-computed by the caller
     or by a feature service before hitting this endpoint.
     """

@@ -1,5 +1,5 @@
 {
-  "passed": true,
-  "checks": 12,
-  "failed": 0
+  "passed": false,
+  "checks": 20,
+  "failed": 1
 }

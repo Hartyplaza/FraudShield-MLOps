@@ -86,3 +86,33 @@ def threshold_curve(model,
         })
 
     return pd.DataFrame(rows)
+
+def tune_threshold_for_precision(model,
+                                 X: pd.DataFrame,
+                                 y: pd.Series,
+                                 min_precision: float,
+                                 cv,
+                                 step: float = 0.01) -> float:
+    """
+    Business rule: catch as much fraud as possible while keeping precision
+    (share of alerts that are real fraud) at or above min_precision.
+
+    Uses out-of-fold predictions over X, so every training row contributes:
+    far more frauds than a single validation split, and a much smoother
+    precision/recall curve. Returns the lowest threshold meeting the precision
+    target, which is the one with the highest recall.
+    """
+    from sklearn.base import clone
+    from sklearn.metrics import precision_score, recall_score
+    from sklearn.model_selection import cross_val_predict
+
+    oof = cross_val_predict(clone(model), X, y, cv=cv, method="predict_proba", n_jobs=-1)[:, 1]
+    for t in np.round(np.arange(step, 1.0, step), 2):
+        y_pred = (oof >= t).astype(int)
+        precision = precision_score(y, y_pred, zero_division=0)
+        if precision >= min_precision:
+            logger.info("Threshold %.2f: out-of-fold precision %.3f >= %.2f, recall %.3f (%d frauds)",
+                        t, precision, min_precision, recall_score(y, y_pred), int(y.sum()))
+            return float(t)
+    logger.warning("No threshold reaches precision %.2f; using 0.99", min_precision)
+    return 0.99
