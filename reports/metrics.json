@@ -1,0 +1,14 @@
+{
+  "best_model": "LightGBM",
+  "threshold": 0.91,
+  "pr_auc": 0.991,
+  "roc_auc": 0.9995,
+  "f1": 0.9449,
+  "precision": 0.9091,
+  "recall": 0.9836,
+  "fpr": 0.004,
+  "tp": 60,
+  "fp": 6,
+  "fn": 1,
+  "tn": 1481
+}

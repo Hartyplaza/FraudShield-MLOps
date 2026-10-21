@@ -1,0 +1,62 @@
+# Versioned pipeline: dvc repro runs only the stages whose inputs changed,
+# and dvc.lock records the exact hash of every input and output.
+# Run with: uv run dvc repro
+stages:
+  generate:
+    cmd: python -m fraudshield.data.generate --config configs/pipeline.yaml --out data/raw/logs.csv
+    deps:
+      - src/fraudshield/data
+    params:
+      - configs/pipeline.yaml:
+          - generator
+    outs:
+      - data/raw/logs.csv
+
+  ingest:
+    cmd: python -m fraudshield.pipeline.ingest --config configs/pipeline.yaml
+    deps:
+      - data/raw/logs.csv
+      - src/fraudshield/ingestion
+      - src/fraudshield/pipeline/ingest.py
+      - src/fraudshield/pipeline/config.py
+    outs:
+      - data/interim/clean.csv
+
+  label:
+    cmd: python -m fraudshield.pipeline.label --config configs/pipeline.yaml
+    deps:
+      - data/interim/clean.csv
+      - src/fraudshield/labelling
+      - src/fraudshield/pipeline/label.py
+      - src/fraudshield/pipeline/config.py
+    outs:
+      - data/interim/labelled.csv
+
+  features:
+    cmd: python -m fraudshield.pipeline.features --config configs/pipeline.yaml
+    deps:
+      - data/interim/labelled.csv
+      - src/fraudshield/features
+      - src/fraudshield/pipeline/features.py
+      - src/fraudshield/pipeline/config.py
+    outs:
+      - data/processed/features.csv
+      - data/processed/encoders.json
+      - data/processed/feature_state.joblib
+
+  train:
+    cmd: python -m fraudshield.pipeline.train --config configs/pipeline.yaml
+    deps:
+      - data/processed/features.csv
+      - data/processed/encoders.json
+      - data/processed/feature_state.joblib
+      - src/fraudshield/training
+      - src/fraudshield/evaluation/metrics.py
+      - src/fraudshield/evaluation/threshold_tuner.py
+      - src/fraudshield/pipeline/train.py
+      - src/fraudshield/pipeline/config.py
+    outs:
+      - models
+    metrics:
+      - reports/metrics.json:
+          cache: false
