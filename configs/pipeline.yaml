@@ -27,6 +27,7 @@ paths:
   model_dir: models
   metrics: reports/metrics.json
   gate: reports/gate.json
+  seeds: reports/seeds.json
 
 tracking:
   enabled: true
@@ -36,6 +37,10 @@ tracking:
 training:
   # Decision threshold: highest recall with out-of-fold precision >= this
   min_precision: 0.90
+
+seeds:
+  # Generator seeds for the robustness check (42 is the training data)
+  seeds: [1, 2, 3, 4, 5, 6, 7, 8]
 
 gates:
   golden_cases: configs/golden_cases.yaml

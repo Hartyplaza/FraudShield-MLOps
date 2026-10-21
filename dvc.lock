@@ -362,3 +362,103 @@ stages:
       hash: md5
       md5: 6101d90cacbe77fddc7c9ac00dff3281
       size: 51
+  seeds:
+    cmd: python -m fraudshield.pipeline.seeds --config configs/pipeline.yaml
+    deps:
+    - path: models
+      hash: md5
+      md5: 812d49da727e4fe7843b049e94544e26.dir
+      size: 1463688
+      nfiles: 6
+    - path: src/fraudshield/data
+      hash: md5
+      md5: dce11c6258e6502a72de618cf53ba3a2.dir
+      size: 5758
+      nfiles: 3
+    - path: src/fraudshield/evaluation/metrics.py
+      hash: md5
+      md5: 05d69d063e15c639e65a9e28041d661b
+      size: 2192
+    - path: src/fraudshield/evaluation/threshold_tuner.py
+      hash: md5
+      md5: 415cedb1757603ad26a27523bfca201f
+      size: 4241
+    - path: src/fraudshield/features
+      hash: md5
+      md5: 88117955504db94b2ddb51bbb2466936.dir
+      size: 15133
+      nfiles: 3
+    - path: src/fraudshield/ingestion
+      hash: md5
+      md5: 54e54cf7468e8d00c6e58032126c7bac.dir
+      size: 8998
+      nfiles: 3
+    - path: src/fraudshield/labelling
+      hash: md5
+      md5: 27d4226256aecc10c8634edb21d3849c.dir
+      size: 3505
+      nfiles: 2
+    - path: src/fraudshield/pipeline/seeds.py
+      hash: md5
+      md5: 2a7deadf7b2c5f00eb19ca3789e64641
+      size: 3753
+    params:
+      configs/pipeline.yaml:
+        generator:
+          profile: assessment
+          seed: 42
+          n_rows: 10000
+          n_users: 86
+          start: '2025-06-01'
+          days: 60
+          null_rate: 0.112
+          malformed_rate: 0.11
+          location_missing_rate: 0.125
+          device_missing_rate: 0.139
+          amount_min: 1.0
+          amount_max: 5000.0
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          locations:
+          - Birmingham
+          - Cardiff
+          - Glasgow
+          - Leeds
+          - Liverpool
+          - London
+          - Manchester
+          devices:
+          - Huawei P30
+          - iPhone 13
+          - Nokia 3310
+          - Pixel 6
+          - Samsung Galaxy S10
+          - Xiaomi Mi 11
+          currencies:
+          - €
+          - £
+          - $
+        seeds:
+          seeds:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+        training:
+          min_precision: 0.9
+    outs:
+    - path: reports/seeds.json
+      hash: md5
+      md5: 898c335279692e22f3d652123ee87fac
+      size: 341

@@ -92,3 +92,23 @@ stages:
     metrics:
       - reports/gate.json:
           cache: false
+
+  seeds:
+    cmd: python -m fraudshield.pipeline.seeds --config configs/pipeline.yaml
+    deps:
+      - models
+      - src/fraudshield/data
+      - src/fraudshield/ingestion
+      - src/fraudshield/labelling
+      - src/fraudshield/features
+      - src/fraudshield/evaluation/metrics.py
+      - src/fraudshield/evaluation/threshold_tuner.py
+      - src/fraudshield/pipeline/seeds.py
+    params:
+      - configs/pipeline.yaml:
+          - generator
+          - training
+          - seeds
+    metrics:
+      - reports/seeds.json:
+          cache: false
