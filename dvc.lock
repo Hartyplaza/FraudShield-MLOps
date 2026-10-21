@@ -292,8 +292,8 @@ stages:
       size: 1004
     - path: src/fraudshield/pipeline/train.py
       hash: md5
-      md5: 713bac4a7eead2de6b2c1733684c6e86
-      size: 1338
+      md5: 7ec4f99a581b2c7fdd063e5238e95046
+      size: 1538
     - path: src/fraudshield/training
       hash: md5
       md5: cedfe1952b2b4ded3c49f7a1aa3d8f6b.dir
@@ -306,9 +306,9 @@ stages:
     outs:
     - path: models
       hash: md5
-      md5: 812d49da727e4fe7843b049e94544e26.dir
-      size: 1463688
-      nfiles: 6
+      md5: e54544bced31cd36acf2473f3e592687.dir
+      size: 1463734
+      nfiles: 7
     - path: reports/metrics.json
       hash: md5
       md5: 3ab067e5e6ef37a012bf62a027f7bd67
@@ -326,9 +326,9 @@ stages:
       size: 2699
     - path: models
       hash: md5
-      md5: 812d49da727e4fe7843b049e94544e26.dir
-      size: 1463688
-      nfiles: 6
+      md5: e54544bced31cd36acf2473f3e592687.dir
+      size: 1463734
+      nfiles: 7
     - path: reports/metrics.json
       hash: md5
       md5: 3ab067e5e6ef37a012bf62a027f7bd67
@@ -367,9 +367,9 @@ stages:
     deps:
     - path: models
       hash: md5
-      md5: 812d49da727e4fe7843b049e94544e26.dir
-      size: 1463688
-      nfiles: 6
+      md5: e54544bced31cd36acf2473f3e592687.dir
+      size: 1463734
+      nfiles: 7
     - path: src/fraudshield/data
       hash: md5
       md5: dce11c6258e6502a72de618cf53ba3a2.dir
@@ -462,3 +462,33 @@ stages:
       hash: md5
       md5: 898c335279692e22f3d652123ee87fac
       size: 341
+  register:
+    cmd: python -m fraudshield.registry.register --config configs/pipeline.yaml
+    deps:
+    - path: models
+      hash: md5
+      md5: e54544bced31cd36acf2473f3e592687.dir
+      size: 1463734
+      nfiles: 7
+    - path: reports/gate.json
+      hash: md5
+      md5: 6101d90cacbe77fddc7c9ac00dff3281
+      size: 51
+    - path: reports/seeds.json
+      hash: md5
+      md5: 898c335279692e22f3d652123ee87fac
+      size: 341
+    - path: src/fraudshield/registry
+      hash: md5
+      md5: ce3ede7387891d83ca2c9add59f147da.dir
+      size: 3452
+      nfiles: 3
+    params:
+      configs/pipeline.yaml:
+        registry:
+          model_name: fraudshield
+    outs:
+    - path: reports/registry.json
+      hash: md5
+      md5: dd46a3b9c2fb5b83c4ba9f61e25464b0
+      size: 117
