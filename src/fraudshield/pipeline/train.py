@@ -15,6 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 from fraudshield.pipeline.config import ensure_parent, stage_args
+from fraudshield.pipeline.tracking import log_run
 from fraudshield.training.train import train
 
 
@@ -36,6 +37,8 @@ def main() -> None:
     }
     with open(ensure_parent(paths["metrics"]), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
+
+    log_run(cfg, result, report)
 
 
 if __name__ == "__main__":

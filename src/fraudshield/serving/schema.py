@@ -13,7 +13,7 @@ class TransactionRequest(BaseModel):
     """
     Input schema for a single transaction to be scored.
 
-    The 28 feature columns match FEATURE_COLS in src/fraudshield/features/engineer.py.
+    The 29 feature columns match FEATURE_COLS in src/fraudshield/features/engineer.py.
     Temporal and behavioural features should be pre-computed by the caller
     or by a feature service before hitting this endpoint.
     """
@@ -29,6 +29,7 @@ class TransactionRequest(BaseModel):
     amount            : float = Field(..., gt=0)
     amount_z_score    : float = 0.0
     is_high_amount    : int   = Field(0, ge=0, le=1)
+    is_risky_type     : int   = Field(0, ge=0, le=1)
     amount_vs_user_max: float = 0.0
     user_mean_amount  : float = 0.0
     user_std_amount   : float = 0.0
@@ -68,6 +69,7 @@ class TransactionRequest(BaseModel):
                 "amount"            : 4800.0,
                 "amount_z_score"    : 3.2,
                 "is_high_amount"    : 1,
+                "is_risky_type"     : 1,
                 "amount_vs_user_max": 0.96,
                 "user_mean_amount"  : 2400.0,
                 "user_std_amount"   : 1200.0,

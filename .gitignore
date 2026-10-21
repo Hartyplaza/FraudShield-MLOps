@@ -20,10 +20,12 @@ data/*
 # ML artifacts
 mlruns/
 mlartifacts/
+mlflow.db
 *.joblib
 *.pkl
 models/
-reports/
+reports/*
+!reports/metrics.json
 
 # Testing and tooling
 .pytest_cache/

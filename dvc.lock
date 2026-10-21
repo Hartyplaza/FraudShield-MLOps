@@ -1,0 +1,188 @@
+schema: '2.0'
+stages:
+  generate:
+    cmd: python -m fraudshield.data.generate --config configs/pipeline.yaml 
+      --out data/raw/logs.csv
+    deps:
+    - path: src/fraudshield/data
+      hash: md5
+      md5: dce11c6258e6502a72de618cf53ba3a2.dir
+      size: 5758
+      nfiles: 3
+    params:
+      configs/pipeline.yaml:
+        generator:
+          profile: assessment
+          seed: 42
+          n_rows: 10000
+          n_users: 86
+          start: '2025-06-01'
+          days: 60
+          null_rate: 0.112
+          malformed_rate: 0.11
+          location_missing_rate: 0.125
+          device_missing_rate: 0.139
+          amount_min: 1.0
+          amount_max: 5000.0
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          locations:
+          - Birmingham
+          - Cardiff
+          - Glasgow
+          - Leeds
+          - Liverpool
+          - London
+          - Manchester
+          devices:
+          - Huawei P30
+          - iPhone 13
+          - Nokia 3310
+          - Pixel 6
+          - Samsung Galaxy S10
+          - Xiaomi Mi 11
+          currencies:
+          - €
+          - £
+          - $
+    outs:
+    - path: data/raw/logs.csv
+      hash: md5
+      md5: 759303a7218e2eef760d3e2fe979d5c1
+      size: 657331
+  ingest:
+    cmd: python -m fraudshield.pipeline.ingest --config configs/pipeline.yaml
+    deps:
+    - path: data/raw/logs.csv
+      hash: md5
+      md5: 759303a7218e2eef760d3e2fe979d5c1
+      size: 657331
+    - path: src/fraudshield/ingestion
+      hash: md5
+      md5: 54e54cf7468e8d00c6e58032126c7bac.dir
+      size: 8998
+      nfiles: 3
+    - path: src/fraudshield/pipeline/config.py
+      hash: md5
+      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
+      size: 1004
+    - path: src/fraudshield/pipeline/ingest.py
+      hash: md5
+      md5: 845c1bba3504246c2a85fe66b0fbab7f
+      size: 576
+    outs:
+    - path: data/interim/clean.csv
+      hash: md5
+      md5: 2673c6427438677d94859b30455a3c1b
+      size: 634982
+  label:
+    cmd: python -m fraudshield.pipeline.label --config configs/pipeline.yaml
+    deps:
+    - path: data/interim/clean.csv
+      hash: md5
+      md5: 2673c6427438677d94859b30455a3c1b
+      size: 634982
+    - path: src/fraudshield/labelling
+      hash: md5
+      md5: 27d4226256aecc10c8634edb21d3849c.dir
+      size: 3505
+      nfiles: 2
+    - path: src/fraudshield/pipeline/config.py
+      hash: md5
+      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
+      size: 1004
+    - path: src/fraudshield/pipeline/label.py
+      hash: md5
+      md5: 3db7a404433537cad5beeeb5fbb59f57
+      size: 576
+    outs:
+    - path: data/interim/labelled.csv
+      hash: md5
+      md5: 67021f4a21fd457492208942ea99ca34
+      size: 650467
+  features:
+    cmd: python -m fraudshield.pipeline.features --config configs/pipeline.yaml
+    deps:
+    - path: data/interim/labelled.csv
+      hash: md5
+      md5: 67021f4a21fd457492208942ea99ca34
+      size: 650467
+    - path: src/fraudshield/features
+      hash: md5
+      md5: f2001ec3aa6231ca14defe92bc2095a3.dir
+      size: 15031
+      nfiles: 3
+    - path: src/fraudshield/pipeline/config.py
+      hash: md5
+      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
+      size: 1004
+    - path: src/fraudshield/pipeline/features.py
+      hash: md5
+      md5: ebbbdc45f99c3e3993a34ebc46591eea
+      size: 1425
+    outs:
+    - path: data/processed/encoders.json
+      hash: md5
+      md5: 0b35e218d06fd5b5373b0b681d81e620
+      size: 659
+    - path: data/processed/feature_state.joblib
+      hash: md5
+      md5: 783f27620490b79595c4577dd74746c0
+      size: 128183
+    - path: data/processed/features.csv
+      hash: md5
+      md5: 57192eb1b544eda4d18d4a91098b1b51
+      size: 2057784
+  train:
+    cmd: python -m fraudshield.pipeline.train --config configs/pipeline.yaml
+    deps:
+    - path: data/processed/encoders.json
+      hash: md5
+      md5: 0b35e218d06fd5b5373b0b681d81e620
+      size: 659
+    - path: data/processed/feature_state.joblib
+      hash: md5
+      md5: 783f27620490b79595c4577dd74746c0
+      size: 128183
+    - path: data/processed/features.csv
+      hash: md5
+      md5: 57192eb1b544eda4d18d4a91098b1b51
+      size: 2057784
+    - path: src/fraudshield/evaluation/metrics.py
+      hash: md5
+      md5: 05d69d063e15c639e65a9e28041d661b
+      size: 2192
+    - path: src/fraudshield/evaluation/threshold_tuner.py
+      hash: md5
+      md5: 773ead67997913b8d1040b7c80adbb59
+      size: 2734
+    - path: src/fraudshield/pipeline/config.py
+      hash: md5
+      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
+      size: 1004
+    - path: src/fraudshield/pipeline/train.py
+      hash: md5
+      md5: 04abe00f9451992b4cd03bb5cc3fbdb0
+      size: 1271
+    - path: src/fraudshield/training
+      hash: md5
+      md5: cf7020e42fe49ca7b0c024c24e7debb5.dir
+      size: 10766
+      nfiles: 2
+    outs:
+    - path: models
+      hash: md5
+      md5: e74caa14799d2c14ff8d5b5b9c6cf0a6.dir
+      size: 1474123
+      nfiles: 6
+    - path: reports/metrics.json
+      hash: md5
+      md5: f4f0e8d86435484083938d87df8b64b1
+      size: 214

@@ -191,3 +191,119 @@ history twice — inflating velocity features and raising false alarms from 19 t
   deliver at-least-once; production needs a transaction ID and de-duplication.
 - **Threshold (0.77) is chosen by F1 on a small validation set** — in practice it is a
   business decision balancing fraud losses against review capacity.
+
+
+## M3 — Experiment tracking and data versioning ✅
+
+**Goal:** every model can be traced back to the exact code, data and settings that
+produced it, compared with other runs, and rebuilt on demand.
+
+### What was built
+
+| Component | Details |
+|---|---|
+| Stream error analysis (`evaluation/stream_errors.py`) | Replays the live stream in-process and breaks misses down by labelling rule, with the features the model saw at the time. |
+| MLflow tracking (`pipeline/tracking.py`) | Every training run logs: git commit and a `git_dirty` flag, SHA-256 of the raw data and feature matrix, generator settings, best hyperparameters, CV PR-AUC of all four candidate models, test metrics, and the full model bundle. Local SQLite store; `MLFLOW_TRACKING_URI` overrides it. Runs are named with `RUN_NAME=`. |
+| DVC pipeline (`dvc.yaml`, `dvc.lock`) | The five stages with exact dependencies. The generate stage depends only on the `generator:` config section, and train only on the evaluation files it uses. `dvc.lock` pins the hash of every input and output and is committed. |
+| Data store | DVC cache pushed to a local folder outside the repo (`~/dvc-store`, configured in the untracked `.dvc/config.local`). Data never enters Git or GitHub. |
+| `reports/metrics.json` in Git | Each commit carries its metrics, so `dvc metrics diff <branch>` compares versions. |
+| `is_risky_type` feature | Added after the error analysis (below). Batch and online versions are covered by the streaming = batch test; 72 tests. |
+
+### Finding: all 9 missed frauds came from one rule
+
+The M2 stream missed 9 of 75 frauds. Breaking the misses down by labelling rule:
+
+| Rule | Frauds | Caught | Missed |
+|---|---|---|---|
+| A only (night + high amount + cashout/transfer/withdrawal) | 37 | 28 | 9 |
+| C only (high amount + device switch + no location) | 29 | 29 | 0 |
+| Combinations | 9 | 9 | 0 |
+
+Rule A is the only rule that depends on the transaction type. The model saw the type
+only as an integer code (`cashout=0 … transfer=6, withdrawal=7`), so the three risky
+types are not contiguous, and fewer than 400 training rows are both night and high amount.
+The model settled for "night + high amount", which explains both the misses and the
+false alarms: 18 of 19 false alarms had two of a rule's three signals, mostly the right
+time and amount with the wrong type. Lowering the threshold would not help, because it
+would also flag the wrong types.
+
+Fix: an explicit `is_risky_type` flag, logged as a second MLflow run and compared with
+the baseline.
+
+| | baseline | risky-type |
+|---|---|---|
+| Features | 28 | 29 |
+| Test PR-AUC | 0.9384 | 0.9910 |
+| Test TP / FP / FN / TN | 56 / 21 / 5 / 1466 | 60 / 6 / 1 / 1481 |
+| Threshold | 0.77 | 0.91 |
+| Stream: caught / missed / false alarms | 66 / 9 / 19 | 72 / 3 / 5 |
+
+Caveat: the labels come from rules, so a feature that mirrors a rule's input is bound
+to help. The general lesson holds on real data: when risky categories are not contiguous
+in an integer encoding, give the model a domain flag, one-hot encoding or native
+categorical handling.
+
+### Is the improvement real? Seed variation
+
+A second dataset (generator seed 7, same size) was built and compared with
+`dvc metrics diff`:
+
+| | seed 42 | seed 7 |
+|---|---|---|
+| PR-AUC | 0.991 | 0.992 |
+| Recall | 0.984 | 0.926 |
+| Precision | 0.909 | 0.943 |
+
+PR-AUC (ranking quality) is stable to about 0.001. Threshold metrics move several points
+because the test sets hold only 54–61 frauds, where one fraud is worth ~2 points of
+recall, and the threshold itself is tuned on a validation set of ~50. The `is_risky_type`
+gain (+0.053 PR-AUC) is roughly 50 times the seed-to-seed variation, so it is real; a
+gain of 0.01 would not have been distinguishable from noise.
+
+### Evidence of reproducibility
+
+- The baseline run reproduced the M2 model exactly (PR-AUC 0.9384, 56/21/5/1466), and
+  its data hashes (`6f7d4dfd…` raw, `1d9a7ddc…` features) matched across two machines.
+- `dvc repro` rebuilt the risky-type model identically (0.991, 60/6/1/1481); a second
+  `repro` skipped every stage.
+- After deleting all data and the model, `dvc pull` restored them byte for byte
+  (`6f7d4dfd`, `8b696e59`), matching the hashes recorded in MLflow.
+- Switching from the seed-7 branch back to `m3-mlflow`, `dvc checkout` restored the
+  seed-42 data and model from cache in under a second, with no retraining.
+
+### Problems hit
+
+**1. An edit script that was never run.** Training ran, but no MLflow run appeared. The
+script that wires in `log_run` had not been executed; training ran only because Make
+also watched the whole `evaluation/` folder, where a new file had appeared. Two lessons:
+check that a step's expected output appeared, and dependencies that are too broad
+trigger rebuilds for the wrong reasons. The DVC train stage lists only the files it uses.
+
+**2. Optional extras are not installed by default.** `ModuleNotFoundError: mlflow` after
+adding it to the `train` extra. `uv sync --all-extras` installs it.
+
+**3. Work done on the wrong branch.** The first MLflow run showed `main` as its source
+branch, meaning the feature branch had never been created. `git switch -c` carried the
+uncommitted changes onto a new branch before committing.
+
+**4. A run before the commit is marked dirty.** The baseline run is tagged
+`git_dirty: true` because it used uncommitted code. Later experiments were committed
+first, then trained, so their runs point at an exact commit.
+
+**5. MLflow UI port already in use.** An earlier UI was still running; it reads the same
+database, so refreshing the page was enough.
+
+### Known issues (carried forward)
+
+- **Two pipeline definitions.** The Makefile (used by the Docker training image) and
+  `dvc.yaml` describe the same DAG and can drift apart.
+- **Docker training runs are not tracked.** The container logs to its own `mlflow.db`,
+  which is discarded on exit. Needs a shared tracking server (M6).
+- **Tracking and data store are local.** Fine for one person; a team needs a remote
+  tracking server and a cloud DVC remote.
+- **The model is logged as plain artifacts**, not as an MLflow model, so it cannot be
+  registered or promoted yet (M5).
+- **Run duration is misleading.** The MLflow run opens after training, so it times the
+  logging (~130 ms), not the 3–4 minute search.
+- **Single-seed evaluation.** Comparisons rest on one split of one dataset. Decisions
+  should use several seeds or confidence intervals (M4).

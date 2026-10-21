@@ -276,4 +276,6 @@ def train(df: pd.DataFrame,
         "metrics"     : metrics,
         "threshold"   : threshold,
         "model_dir"   : str(model_dir),
+        "best_params" : best_entry["params"],
+        "cv_scores"   : {k: float(v["score"]) for k, v in results.items()},
     }

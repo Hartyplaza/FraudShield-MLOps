@@ -2,7 +2,7 @@
 src/fraudshield/features/engineer.py
 
 Feature engineering pipeline for fraud detection.
-Builds 28 features across 6 groups from the cleaned, labelled DataFrame.
+Builds 29 features across 6 groups from the cleaned, labelled DataFrame.
 
 Feature groups:
     1. Temporal          - hour, day_of_week, is_night, is_weekend, is_business_hours
@@ -20,14 +20,17 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 HIGH_AMOUNT_THRESHOLD = 4000.0
+
+# Irreversible money movement: the transaction types fraudsters cash out with
+RISKY_TYPES = {"cashout", "transfer", "withdrawal"}
 VELOCITY_WINDOWS      = ["1D", "7D", "30D"]
 
-# Exact 28 feature columns the model expects at inference time
+# Exact 29 feature columns the model expects at inference time
 FEATURE_COLS = [
     # Temporal
     "hour", "day_of_week", "is_night", "is_weekend", "is_business_hours",
     # Amount
-    "amount", "amount_z_score", "is_high_amount", "amount_vs_user_max",
+    "amount", "amount_z_score", "is_high_amount", "is_risky_type", "amount_vs_user_max",
     "user_mean_amount", "user_std_amount", "user_max_amount",
     # Velocity
     "txn_count_1d", "txn_sum_1d", "txn_count_7d", "txn_sum_7d",
@@ -74,6 +77,7 @@ def add_amount_features(df: pd.DataFrame) -> pd.DataFrame:
     - user_max_amount: user's historical maximum
     - amount_z_score: standard deviations above/below user's mean
     - is_high_amount: absolute flag for amounts >= 4,000
+    - is_risky_type: 1 for cashout, transfer or withdrawal
     - amount_vs_user_max: current amount as fraction of user's max
     """
     logger.info("Adding amount features...")
@@ -92,6 +96,7 @@ def add_amount_features(df: pd.DataFrame) -> pd.DataFrame:
         df["user_std_amount"].replace(0, 1)
     )
     df["is_high_amount"]     = (df["amount"] >= HIGH_AMOUNT_THRESHOLD).astype(int)
+    df["is_risky_type"]      = df["txn_type"].isin(RISKY_TYPES).astype(int)
     df["amount_vs_user_max"] = df["amount"] / df["user_max_amount"].replace(0, 1)
 
     return df
@@ -212,7 +217,7 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         df: cleaned, labelled DataFrame sorted by user_id + timestamp
 
     Returns:
-        DataFrame with all 28 engineered features added.
+        DataFrame with all 29 engineered features added.
         Original columns are preserved alongside new feature columns.
     """
     logger.info("Building feature matrix...")
