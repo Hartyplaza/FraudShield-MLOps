@@ -31,3 +31,16 @@ tracking:
   enabled: true
   uri: sqlite:///mlflow.db
   experiment: fraudshield
+
+validation:
+  min_rows: 1000
+  min_parse_rate: 0.6
+  amount_range: [0.01, 10000]
+  fraud_rate: [0.01, 0.10]
+  max_null_rate:
+    location: 0.25
+    device: 0.25
+    currency: 0.40
+  txn_types: [cashout, debit, deposit, purchase, refund, top-up, transfer, withdrawal]
+  currencies: ["€", "£", "$"]
+  log_formats: [arrow_bracket, dash_equals, dmy_triple_colon, pipe_bar, pipe_colon, space_separated, usr_pipe]

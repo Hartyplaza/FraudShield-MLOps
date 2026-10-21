@@ -75,8 +75,49 @@ stages:
       size: 1004
     - path: src/fraudshield/pipeline/ingest.py
       hash: md5
-      md5: 845c1bba3504246c2a85fe66b0fbab7f
-      size: 576
+      md5: 67e88d9acc764873bbf49638d22521b0
+      size: 956
+    - path: src/fraudshield/validation
+      hash: md5
+      md5: 9240f848535daeb3e9513d5019e6fb37.dir
+      size: 5142
+      nfiles: 2
+    params:
+      configs/pipeline.yaml:
+        validation:
+          min_rows: 1000
+          min_parse_rate: 0.6
+          amount_range:
+          - 0.01
+          - 10000
+          fraud_rate:
+          - 0.01
+          - 0.1
+          max_null_rate:
+            location: 0.25
+            device: 0.25
+            currency: 0.4
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          currencies:
+          - €
+          - £
+          - $
+          log_formats:
+          - arrow_bracket
+          - dash_equals
+          - dmy_triple_colon
+          - pipe_bar
+          - pipe_colon
+          - space_separated
+          - usr_pipe
     outs:
     - path: data/interim/clean.csv
       hash: md5
@@ -100,8 +141,49 @@ stages:
       size: 1004
     - path: src/fraudshield/pipeline/label.py
       hash: md5
-      md5: 3db7a404433537cad5beeeb5fbb59f57
-      size: 576
+      md5: acc36bda5bfd1b79016c6218a65b2216
+      size: 707
+    - path: src/fraudshield/validation
+      hash: md5
+      md5: 9240f848535daeb3e9513d5019e6fb37.dir
+      size: 5142
+      nfiles: 2
+    params:
+      configs/pipeline.yaml:
+        validation:
+          min_rows: 1000
+          min_parse_rate: 0.6
+          amount_range:
+          - 0.01
+          - 10000
+          fraud_rate:
+          - 0.01
+          - 0.1
+          max_null_rate:
+            location: 0.25
+            device: 0.25
+            currency: 0.4
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          currencies:
+          - €
+          - £
+          - $
+          log_formats:
+          - arrow_bracket
+          - dash_equals
+          - dmy_triple_colon
+          - pipe_bar
+          - pipe_colon
+          - space_separated
+          - usr_pipe
     outs:
     - path: data/interim/labelled.csv
       hash: md5
@@ -125,8 +207,49 @@ stages:
       size: 1004
     - path: src/fraudshield/pipeline/features.py
       hash: md5
-      md5: ebbbdc45f99c3e3993a34ebc46591eea
-      size: 1425
+      md5: 5a99df4da5af9d2e6b12db23075b7a0d
+      size: 1565
+    - path: src/fraudshield/validation
+      hash: md5
+      md5: 9240f848535daeb3e9513d5019e6fb37.dir
+      size: 5142
+      nfiles: 2
+    params:
+      configs/pipeline.yaml:
+        validation:
+          min_rows: 1000
+          min_parse_rate: 0.6
+          amount_range:
+          - 0.01
+          - 10000
+          fraud_rate:
+          - 0.01
+          - 0.1
+          max_null_rate:
+            location: 0.25
+            device: 0.25
+            currency: 0.4
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          currencies:
+          - €
+          - £
+          - $
+          log_formats:
+          - arrow_bracket
+          - dash_equals
+          - dmy_triple_colon
+          - pipe_bar
+          - pipe_colon
+          - space_separated
+          - usr_pipe
     outs:
     - path: data/processed/encoders.json
       hash: md5

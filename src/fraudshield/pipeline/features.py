@@ -21,6 +21,7 @@ import pandas as pd
 
 from fraudshield.features.online import CategoryEncoder, replay
 from fraudshield.pipeline.config import ensure_parent, stage_args
+from fraudshield.validation.schemas import features_schema, validate
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ def main() -> None:
     df = pd.read_csv(paths["labelled"], parse_dates=["timestamp"])
     encoder = CategoryEncoder().fit(df)
     features, state = replay(df, encoder)
+    validate(features, features_schema(cfg["validation"]), "features")
 
     out = pd.concat([df, features], axis=1)
     out.to_csv(ensure_parent(paths["features"]), index=False)

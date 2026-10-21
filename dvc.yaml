@@ -19,6 +19,10 @@ stages:
       - src/fraudshield/ingestion
       - src/fraudshield/pipeline/ingest.py
       - src/fraudshield/pipeline/config.py
+      - src/fraudshield/validation
+    params:
+      - configs/pipeline.yaml:
+          - validation
     outs:
       - data/interim/clean.csv
 
@@ -29,6 +33,10 @@ stages:
       - src/fraudshield/labelling
       - src/fraudshield/pipeline/label.py
       - src/fraudshield/pipeline/config.py
+      - src/fraudshield/validation
+    params:
+      - configs/pipeline.yaml:
+          - validation
     outs:
       - data/interim/labelled.csv
 
@@ -39,6 +47,10 @@ stages:
       - src/fraudshield/features
       - src/fraudshield/pipeline/features.py
       - src/fraudshield/pipeline/config.py
+      - src/fraudshield/validation
+    params:
+      - configs/pipeline.yaml:
+          - validation
     outs:
       - data/processed/features.csv
       - data/processed/encoders.json
