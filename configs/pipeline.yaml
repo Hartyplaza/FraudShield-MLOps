@@ -26,11 +26,20 @@ paths:
   feature_state: data/processed/feature_state.joblib
   model_dir: models
   metrics: reports/metrics.json
+  gate: reports/gate.json
 
 tracking:
   enabled: true
   uri: sqlite:///mlflow.db
   experiment: fraudshield
+
+gates:
+  golden_cases: configs/golden_cases.yaml
+  metrics:
+    min_pr_auc: 0.95
+    min_recall: 0.90
+    min_precision: 0.85
+    max_fpr: 0.01
 
 validation:
   min_rows: 1000

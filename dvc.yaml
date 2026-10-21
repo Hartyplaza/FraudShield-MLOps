@@ -72,3 +72,19 @@ stages:
     metrics:
       - reports/metrics.json:
           cache: false
+
+  gate:
+    cmd: python -m fraudshield.pipeline.gate --config configs/pipeline.yaml
+    deps:
+      - models
+      - reports/metrics.json
+      - configs/golden_cases.yaml
+      - src/fraudshield/evaluation/gates.py
+      - src/fraudshield/pipeline/gate.py
+      - src/fraudshield/serving
+    params:
+      - configs/pipeline.yaml:
+          - gates
+    metrics:
+      - reports/gate.json:
+          cache: false

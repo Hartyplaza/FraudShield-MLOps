@@ -309,3 +309,46 @@ stages:
       hash: md5
       md5: f4f0e8d86435484083938d87df8b64b1
       size: 214
+  gate:
+    cmd: python -m fraudshield.pipeline.gate --config configs/pipeline.yaml
+    deps:
+    - path: configs/golden_cases.yaml
+      hash: md5
+      md5: 8836fbfd8c7d7e26429ee23c1bdce8b5
+      size: 2699
+    - path: models
+      hash: md5
+      md5: e74caa14799d2c14ff8d5b5b9c6cf0a6.dir
+      size: 1474123
+      nfiles: 6
+    - path: reports/metrics.json
+      hash: md5
+      md5: f4f0e8d86435484083938d87df8b64b1
+      size: 214
+    - path: src/fraudshield/evaluation/gates.py
+      hash: md5
+      md5: c674281499268e6108fa0396bd75e3ee
+      size: 1963
+    - path: src/fraudshield/pipeline/gate.py
+      hash: md5
+      md5: c19a8ed6c43a1913cf0504569ce9857f
+      size: 1847
+    - path: src/fraudshield/serving
+      hash: md5
+      md5: 0eb4f1accaa0c43ee2c4927197f05f85.dir
+      size: 19839
+      nfiles: 6
+    params:
+      configs/pipeline.yaml:
+        gates:
+          golden_cases: configs/golden_cases.yaml
+          metrics:
+            min_pr_auc: 0.95
+            min_recall: 0.9
+            min_precision: 0.85
+            max_fpr: 0.01
+    outs:
+    - path: reports/gate.json
+      hash: md5
+      md5: 11d46a09f7b0847f5637903bc0b4777d
+      size: 51
