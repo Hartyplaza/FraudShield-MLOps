@@ -16,6 +16,13 @@ from fraudshield.features.engineer import FEATURE_COLS
 from fraudshield.features.online import CategoryEncoder, FeatureState
 from fraudshield.ingestion.parser import parse_log_line
 from fraudshield.pipeline.config import load_config
+from fraudshield.registry.promote import (
+    CHAMPION,
+    compare,
+    current_version,
+    decide,
+    set_champion,
+)
 from fraudshield.registry.register import CHALLENGER, register_bundle
 from fraudshield.serving.predictor import FraudPredictor
 from fraudshield.serving.scorer import RawScorer
@@ -86,3 +93,38 @@ def test_registered_model_scores_like_the_api(bundle, tracking):
     scorer = RawScorer.from_model_dir(predictor, model_dir)
     direct = [scorer.score(line)["fraud_probability"] for line in stream]
     assert via_registry == direct
+
+
+# ---------------------------------------------------------------- promotion
+def test_decide_allows_a_small_drop_but_not_a_large_one():
+    close = pd.DataFrame({"diff": [-0.004, 0.002, -0.006, 0.000]})
+    worse = pd.DataFrame({"diff": [-0.05, -0.02, -0.08, 0.01]})
+    assert decide(close, max_drop=0.005)[0]
+    promote, summary = decide(worse, max_drop=0.005)
+    assert not promote and "better on 1 of 4" in summary
+
+
+def test_set_champion_moves_the_alias_and_logs_every_move(bundle, tracking, tmp_path):
+    model_dir, _ = bundle
+    log = tmp_path / "promotions.jsonl"
+    v1 = register_bundle(str(model_dir), new_run(), "fs", {})
+    v2 = register_bundle(str(model_dir), new_run(), "fs", {})
+    set_champion(tracking, "fs", v1, "first", str(log))
+    set_champion(tracking, "fs", v2, "better", str(log))
+    set_champion(tracking, "fs", v1, "rollback", str(log))
+    assert current_version(tracking, "fs", CHAMPION) == v1
+    assert tracking.get_model_version("fs", str(v1)).tags["previous_champion"] == str(v2)
+    moves = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [(m["from"], m["to"], m["reason"]) for m in moves] == [
+        (None, v1, "first"), (v1, v2, "better"), (v2, v1, "rollback")]
+
+
+def test_compare_scores_both_versions_on_the_same_datasets(bundle, tracking):
+    model_dir, _ = bundle
+    v1 = register_bundle(str(model_dir), new_run(), "fs", {})
+    cfg = load_config()
+    cfg["generator"]["n_rows"] = 2000
+    cfg["seeds"]["seeds"] = [3]
+    table = compare(cfg, "fs", v1, v1)
+    # Same version on the same data: the paired difference is exactly zero
+    assert len(table) == 1 and table["diff"].iloc[0] == 0

@@ -478,11 +478,14 @@ stages:
       hash: md5
       md5: 898c335279692e22f3d652123ee87fac
       size: 341
-    - path: src/fraudshield/registry
+    - path: src/fraudshield/registry/pyfunc_model.py
       hash: md5
-      md5: ce3ede7387891d83ca2c9add59f147da.dir
-      size: 3452
-      nfiles: 3
+      md5: 3c2b8a4e5013e2ea7062b2970c037572
+      size: 1101
+    - path: src/fraudshield/registry/register.py
+      hash: md5
+      md5: 88c3c8380c6d518c9586ed67cb7f5f7e
+      size: 2351
     params:
       configs/pipeline.yaml:
         registry:

@@ -29,6 +29,7 @@ reports/*
 !reports/gate.json
 !reports/seeds.json
 !reports/registry.json
+!reports/promotions.jsonl
 
 # Testing and tooling
 .pytest_cache/
