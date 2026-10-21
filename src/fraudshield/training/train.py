@@ -35,7 +35,10 @@ from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
 from fraudshield.evaluation.metrics import evaluate
-from fraudshield.evaluation.threshold_tuner import tune_threshold
+from fraudshield.evaluation.threshold_tuner import (
+    tune_threshold,
+    tune_threshold_for_precision,
+)
 from fraudshield.features.engineer import FEATURE_COLS
 
 logger = logging.getLogger(__name__)
@@ -180,7 +183,8 @@ def _search_xgboost(pipeline, param_space, X_train, y_train, cv) -> tuple:
 def train(df: pd.DataFrame,
           label_col: str = "is_fraud",
           model_dir: str = "data/processed/",
-          config_path: str = "configs/pipeline.yaml") -> dict:
+          config_path: str = "configs/pipeline.yaml",
+          min_precision: float | None = None) -> dict:
     """
     Full training pipeline: search -> select -> refit with ADASYN -> tune threshold -> save.
 
@@ -189,6 +193,9 @@ def train(df: pd.DataFrame,
         label_col:   name of the label column
         model_dir:   directory to save artefacts
         config_path: YAML config path (optional)
+        min_precision: if set, choose the threshold with the highest recall whose
+                     out-of-fold precision is at least this; otherwise maximise
+                     F1 on the validation set
 
     Returns:
         dict of best model name, metrics, and artefact paths
@@ -250,8 +257,12 @@ def train(df: pd.DataFrame,
         best_model.set_params(**best_entry["params"])
     best_model.fit(X_train, y_train)
 
-    # Tune threshold on validation set
-    threshold = tune_threshold(best_model, X_val, y_val)
+    # Choose the decision threshold
+    if min_precision is not None:
+        threshold = tune_threshold_for_precision(
+            best_model, X_trainval, y_trainval, min_precision, cv)
+    else:
+        threshold = tune_threshold(best_model, X_val, y_val)
 
     # Final evaluation on test set
     metrics = evaluate(best_model, X_test, y_test, threshold=threshold)

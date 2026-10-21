@@ -1,0 +1,16 @@
+{
+  "seeds": 8,
+  "pr_auc_mean": 0.9646,
+  "recall_mean": 0.9052,
+  "precision_mean": 0.8998,
+  "fpr_mean": 0.0039,
+  "threshold_mean": 0.9112,
+  "pr_auc_std": 0.019,
+  "recall_std": 0.0623,
+  "precision_std": 0.0444,
+  "fpr_std": 0.0018,
+  "threshold_std": 0.0432,
+  "pr_auc_min": 0.9276,
+  "recall_min": 0.8148,
+  "precision_min": 0.8333
+}

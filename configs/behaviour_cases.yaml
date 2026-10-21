@@ -1,0 +1,35 @@
+# Behaviour checks: how the model's score should respond when one thing changes.
+#
+# invariance: the transaction is scored in every log format and currency; the
+#   score must not move by more than gates.invariance_tolerance.
+# directional: 'riskier' overrides one or two fields of 'txn' in a riskier
+#   direction; the score must not drop.
+#
+# Each check runs on new users, so training history does not matter.
+
+history:
+  - {timestamp: "2025-08-01 12:00:00", txn_type: purchase, amount: 150.0, location: London, device: iPhone 13}
+
+invariance:
+  - name: large night cashout
+    txn: {timestamp: "2025-08-02 02:30:00", txn_type: cashout, amount: 4800.0, location: London, device: iPhone 13}
+  - name: large night purchase (borderline)
+    txn: {timestamp: "2025-08-02 02:30:00", txn_type: purchase, amount: 4800.0, location: London, device: iPhone 13}
+  - name: large deposit, new device, no location
+    txn: {timestamp: "2025-08-02 15:00:00", txn_type: deposit, amount: 4600.0, location: null, device: Nokia 3310}
+  - name: small daytime purchase
+    txn: {timestamp: "2025-08-02 15:00:00", txn_type: purchase, amount: 300.0, location: London, device: iPhone 13}
+
+directional:
+  - name: night cashout, amount 1500 -> 4800
+    txn: {timestamp: "2025-08-02 02:30:00", txn_type: cashout, amount: 1500.0, location: London, device: iPhone 13}
+    riskier: {amount: 4800.0}
+  - name: large cashout, afternoon -> 2am
+    txn: {timestamp: "2025-08-02 14:30:00", txn_type: cashout, amount: 4800.0, location: London, device: iPhone 13}
+    riskier: {timestamp: "2025-08-02 02:30:00"}
+  - name: large night transaction, purchase -> cashout
+    txn: {timestamp: "2025-08-02 02:30:00", txn_type: purchase, amount: 4800.0, location: London, device: iPhone 13}
+    riskier: {txn_type: cashout}
+  - name: large deposit, known -> new device and no location
+    txn: {timestamp: "2025-08-02 15:00:00", txn_type: deposit, amount: 4600.0, location: London, device: iPhone 13}
+    riskier: {location: null, device: Nokia 3310}

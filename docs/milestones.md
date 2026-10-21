@@ -260,6 +260,10 @@ recall, and the threshold itself is tuned on a validation set of ~50. The `is_ri
 gain (+0.053 PR-AUC) is roughly 50 times the seed-to-seed variation, so it is real; a
 gain of 0.01 would not have been distinguishable from noise.
 
+> **Correction (M4):** two seeds were not enough. Across 8 datasets PR-AUC varies by
+> about ±0.02, not ±0.001. A paired comparison on the same 8 datasets confirms the
+> `is_risky_type` gain (+0.048, better on 8 of 8). See M4, finding 4.
+
 ### Evidence of reproducibility
 
 - The baseline run reproduced the M2 model exactly (PR-AUC 0.9384, 56/21/5/1466), and
@@ -307,3 +311,113 @@ database, so refreshing the page was enough.
   logging (~130 ms), not the 3–4 minute search.
 - **Single-seed evaluation.** Comparisons rest on one split of one dataset. Decisions
   should use several seeds or confidence intervals (M4).
+
+## M4 — Data validation and ML-specific tests ✅
+
+**Goal:** bad data stops the pipeline before it reaches a model, and a model that is
+worse, broken or leaning on the wrong signals is rejected before it is accepted.
+
+### What was built
+
+| Component | Details |
+|---|---|
+| Data contracts (`validation/schemas.py`, pandera) | Checked after ingest, label and features. Row checks: types, `user_id` pattern, known transaction types, currencies and log formats, amount in [0.01, 10000], binary flags, non-negative counts, NaN only where expected. Batch checks: at least 1,000 rows, at least 60% of raw lines parsed, null rates, fraud rate in [1%, 10%]. Limits live in `configs/pipeline.yaml -> validation`. |
+| Quality gate stage (`pipeline/gate.py`) | Runs after training. Metric limits (PR-AUC ≥ 0.95, recall ≥ 0.90, precision ≥ 0.85, FPR ≤ 1%), 8 golden cases scored end to end from raw log lines, 4 invariance checks and 4 directional checks. Its own DVC stage, so changing a limit re-checks the model in seconds without retraining. |
+| Threshold policy | Highest recall with out-of-fold precision ≥ 0.90 (`training.min_precision`), tuned on cross-validated predictions over all 243 training frauds instead of F1 on 49 validation frauds. |
+| Seed robustness stage (`pipeline/seeds.py`) | Refits the model recipe on 8 freshly generated datasets and reports mean, spread and worst case per metric (`reports/seeds.json`). |
+| Tests | 98 total, including 16 that each feed one kind of bad batch and assert the *specific* check that stops it. |
+
+Pipeline: `generate → ingest → label → features → train → gate → seeds`, with
+validation inside the first three data stages.
+
+### Finding 1: bad data is stopped where it enters
+
+Drill: raising the generator's malformed-line rate from 11% to 50%. Ingest stopped with
+`only 39.5% of raw rows parsed (minimum 60%)`; label, features and training never ran
+and the model on disk was untouched. `git checkout` of the config and `dvc.lock` plus
+`dvc checkout` restored the previous state.
+
+### Finding 2: the gate would have rejected the M2 model
+
+Pointing the gate at the M2 baseline (from its MLflow artifacts): fails PR-AUC (0.938),
+precision (0.727) and FPR (1.4%). It still passed every golden case; the £4,800 night
+purchase scored 0.495, much closer to the line than now. Metric limits catch a worse
+model; golden and behaviour cases catch a broken or misguided one.
+
+### Finding 3: the model was reading the log format
+
+Invariance check: the same transaction written in each of 7 log formats and 3
+currencies. Decisions never changed, but for a £4,800 night purchase the score ranged
+from 0.025 to 0.334 depending only on format and currency, enough to flip the API's
+`risk_level` between low and medium. The fraud rules never use either field, but both
+were model inputs (`log_format_encoded`, `currency_encoded`).
+
+Fix: drop both features (29 → 27). Every invariance spread is now exactly 0.0000.
+
+Removing them exposed a second problem. The retrained model was better (PR-AUC 0.993)
+but failed the precision gate (0.82): the F1-tuned threshold picked 0.80 over 0.85 on
+the strength of one transaction among 49 validation frauds, costing 7 extra false
+alarms. Replacing it with a stated precision target on out-of-fold predictions gave a
+threshold of 0.90 and passed all 20 checks.
+
+| | M3 model | M4 model |
+|---|---|---|
+| Features | 29 | 27 |
+| Threshold rule | best F1 on 49 validation frauds | highest recall with precision ≥ 0.90, out-of-fold over 243 frauds |
+| Format/currency score spread | 0.31 | 0.00 |
+| Test PR-AUC (seed 42) | 0.991 | 0.993 |
+| Test TP / FP / FN | 60 / 6 / 1 | 59 / 6 / 2 |
+| Live stream: caught / false alarms | 72 / 5 | 72 / 6 |
+| Quality gate | fails 1 of 20 | passes 20 of 20 |
+
+### Finding 4: the M3 noise estimate was wrong
+
+Across 8 new datasets, the current recipe scores:
+
+| | mean | ± sd | worst |
+|---|---|---|---|
+| PR-AUC | 0.965 | 0.019 | 0.928 |
+| Recall | 0.905 | 0.062 | 0.815 |
+| Precision | 0.900 | 0.044 | 0.833 |
+
+Seed 42 (0.993) sits at the lucky end, partly because the hyperparameters were tuned on
+it. M3 called PR-AUC "stable to about 0.001" from two seeds that happened to agree; the
+real spread is about ±0.02. Re-testing both feature changes as paired comparisons on
+the same 8 datasets:
+
+| Change | Mean PR-AUC change | Better on | Verdict |
+|---|---|---|---|
+| `is_risky_type` added (M3) | +0.048 | 8 of 8 seeds | Real: ~7× the noise |
+| Format and currency removed (M4) | −0.002 | 3 of 8 seeds | No measurable accuracy effect; justified by invariance |
+
+Lesson: compare changes on the same set of datasets (paired), never one run against
+another.
+
+### Problems hit
+
+**1. A commit without its wiring.** The gate's files were committed, but the script that
+adds its config and DVC stage was never run; tests failed with `KeyError: 'gates'` and
+the next commands ran anyway because each was on its own line. Fixed with a follow-up
+commit; later steps chained commands with `&&` so a failure stops the chain.
+
+**2. Missing columns were hard to read.** pandera reports a missing column at batch
+level, with the name only in the failure value. The report now names the column.
+
+**3. A failed gate writes `gate.json`.** Committing it would put a failed result in Git;
+it is reset with `git checkout -- reports/gate.json` before committing, so Git only
+holds results from passing runs.
+
+### Known issues (carried forward)
+
+- **Gate limits are judged on one dataset.** The recall limit (≥ 0.90) passes on seed 42
+  but this recipe would fail it on 3 of 8 seeds. Promotion (M5) should compare a
+  challenger with the current champion across seeds, not one split.
+- **Docker skips the gate and seeds stages.** The training image runs `make all`, which
+  includes validation (it lives inside the stage scripts) but not the two new stages;
+  the Makefile and `dvc.yaml` have drifted further apart.
+- **Golden and behaviour cases are hand-written** and cover the known rules; they say
+  nothing about fraud patterns nobody wrote down.
+- **The seed stage reuses seed-42 hyperparameters**, so it measures the variance of this
+  exact recipe, not of the whole training procedure (which would include the search).
+- **`/predict` still accepts `log_format_encoded` and `currency_encoded`**; the model
+  ignores them, but the request schema should drop them.

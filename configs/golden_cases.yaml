@@ -1,0 +1,55 @@
+# Golden cases: transactions whose correct decision is not in doubt.
+# A new model must get every one right before it is accepted.
+#
+# Each case uses its own new user, so it does not depend on training history.
+# 'history' lines are scored first (to give the user a normal pattern), then
+# 'line' is the transaction under test. Lines are raw logs in pipe_bar format.
+
+cases:
+  - name: large cashout at night
+    expect: fraud
+    history:
+      - "2025-08-01 12:10:00 | user: user9001 | txn: purchase of £120.00 from London | device: iPhone 13"
+    line: "2025-08-02 02:30:00 | user: user9001 | txn: cashout of £4800.00 from London | device: iPhone 13"
+
+  - name: large transfer at night
+    expect: fraud
+    history:
+      - "2025-08-01 09:40:00 | user: user9002 | txn: purchase of £60.00 from Leeds | device: Pixel 6"
+    line: "2025-08-02 03:15:00 | user: user9002 | txn: transfer of £4700.00 from Leeds | device: Pixel 6"
+
+  - name: large night transaction with no location
+    expect: fraud
+    history:
+      - "2025-08-01 15:00:00 | user: user9003 | txn: purchase of £35.00 from Cardiff | device: Pixel 6"
+    line: "2025-08-02 01:10:00 | user: user9003 | txn: purchase of £4700.00 from None | device: Pixel 6"
+
+  - name: large amount on a new device with no location
+    expect: fraud
+    history:
+      - "2025-08-01 11:00:00 | user: user9004 | txn: purchase of £80.00 from London | device: iPhone 13"
+    line: "2025-08-02 15:00:00 | user: user9004 | txn: deposit of £4600.00 from None | device: Nokia 3310"
+
+  - name: small daytime purchase
+    expect: legit
+    history:
+      - "2025-08-01 12:00:00 | user: user9005 | txn: purchase of £40.00 from Glasgow | device: iPhone 13"
+    line: "2025-08-02 13:00:00 | user: user9005 | txn: purchase of £45.20 from Glasgow | device: iPhone 13"
+
+  - name: small cashout at night
+    expect: legit
+    history:
+      - "2025-08-01 12:00:00 | user: user9006 | txn: purchase of £40.00 from Leeds | device: Pixel 6"
+    line: "2025-08-02 02:00:00 | user: user9006 | txn: cashout of £80.00 from Leeds | device: Pixel 6"
+
+  - name: large night purchase, known device and location
+    expect: legit
+    history:
+      - "2025-08-01 12:00:00 | user: user9007 | txn: purchase of £300.00 from London | device: iPhone 13"
+    line: "2025-08-02 02:30:00 | user: user9007 | txn: purchase of £4800.00 from London | device: iPhone 13"
+
+  - name: large daytime transfer, known device and location
+    expect: legit
+    history:
+      - "2025-08-01 10:00:00 | user: user9008 | txn: purchase of £300.00 from Manchester | device: Pixel 6"
+    line: "2025-08-02 14:00:00 | user: user9008 | txn: transfer of £4800.00 from Manchester | device: Pixel 6"

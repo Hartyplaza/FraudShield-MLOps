@@ -26,31 +26,35 @@ starts the API on `http://localhost:8000`. Interactive docs: `http://localhost:8
 
 ```bash
 curl localhost:8000/health
-# {"status":"ok","model_loaded":true,"threshold":0.91,"version":"0.1.0"}
+# {"status":"ok","model_loaded":true,"threshold":0.9,"version":"0.1.0"}
 ```
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    G[Synthetic log generator] --> R[(raw logs)]
-    R --> I[ingest: parse + clean]
-    I --> L[label: fraud rules]
-    L --> F[features: 28 features]
-    F --> T[train: 4-model search,<br/>threshold tuning]
-    T --> M[(model volume)]
-    M -->|read-only| A[FastAPI /predict]
+    G[generate] --> I[ingest + validate]
+    I --> L[label + validate]
+    L --> F[features + validate]
+    F --> T[train: model search,<br/>precision-target threshold]
+    T --> Q{quality gate}
+    Q -->|pass| S[seeds: robustness<br/>across 8 datasets]
+    Q -->|pass| M[(model bundle)]
+    M --> A[FastAPI /score, /predict]
 ```
 
-| Stage | Command | Output |
+| Stage | What it does | Output |
 |---|---|---|
-| Generate | `python -m fraudshield.data.generate` | `data/raw/logs.csv` |
-| Ingest | `python -m fraudshield.pipeline.ingest` | `data/interim/clean.csv` |
-| Label | `python -m fraudshield.pipeline.label` | `data/interim/labelled.csv` |
-| Features | `python -m fraudshield.pipeline.features` | `data/processed/features.csv` |
-| Train | `python -m fraudshield.pipeline.train` | `models/`, `reports/metrics.json` |
+| generate | synthetic raw logs from config | `data/raw/logs.csv` |
+| ingest | parse 7 formats, clean, **validate** | `data/interim/clean.csv` |
+| label | deterministic fraud rules, **validate** (incl. fraud rate) | `data/interim/labelled.csv` |
+| features | 27 leak-free features, **validate** | `data/processed/` |
+| train | 4-model search, threshold by precision target, MLflow run | `models/`, `reports/metrics.json` |
+| gate | metric limits, golden cases, invariance and directional checks | `reports/gate.json` |
+| seeds | refit the recipe on 8 new datasets | `reports/seeds.json` |
 
-`make all` runs the stages in order and reruns only those whose inputs changed.
+`uv run dvc repro` runs the stages in order and reruns only those whose inputs
+changed. Any failed check stops the pipeline at that stage.
 
 In Docker, a **train** container runs the pipeline once and writes the model to a
 shared volume. The **api** container starts only after training succeeds, and
@@ -58,17 +62,18 @@ mounts the model read-only.
 
 ## Results
 
-Current model (M3), on generated data (seed 42), test set of 1,548 transactions,
-with leak-free features computed exactly as in production:
+Current model (M4): LightGBM, 27 features, threshold 0.90 (highest recall with
+precision at least 0.90 on out-of-fold predictions).
 
-| Metric | Value |
-|---|---|
-| Model | LightGBM, 29 features |
-| PR-AUC | 0.991 |
-| Recall | 0.984 |
-| Precision | 0.909 |
-| False positive rate | 0.40% |
-| Live stream (2 unseen weeks) | 72 of 75 frauds caught, 5 false alarms |
+| Metric | Training data (seed 42) | Across 8 new datasets (mean ± sd) |
+|---|---|---|
+| PR-AUC | 0.993 | 0.965 ± 0.019 |
+| Recall | 0.967 | 0.905 ± 0.062 |
+| Precision | 0.908 | 0.900 ± 0.044 |
+| False positive rate | 0.40% | 0.39% ± 0.18% |
+
+Live stream (2 unseen weeks): 72 of 75 frauds caught, 6 false alarms. The quality
+gate passes 20 of 20 checks, and the score does not depend on log format or currency.
 
 **Reproducibility:** identical models were produced in independent environments
 (pip, `uv` on WSL2, Docker). Every training run is logged to MLflow with its git
@@ -80,7 +85,7 @@ commit and data hashes, and `dvc.lock` pins the exact data behind each commit.
 uv sync --all-extras                # install from the lockfile
 RUN_NAME=my-run uv run dvc repro    # run the pipeline; only changed stages rerun
 uv run dvc metrics show             # current metrics
-make test                           # 72 tests
+make test                           # 98 tests
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse runs
 uv run uvicorn fraudshield.serving.api:app --port 8000
 ```
@@ -100,15 +105,17 @@ src/fraudshield/
 ├── data/ synthetic log generator (7 formats)
 ├── ingestion/ multi-format parser + cleaner
 ├── labelling/ deterministic fraud rules
-├── features/ 29 engineered features
+├── features/ 27 engineered features
 ├── training/ model search, oversampling, threshold tuning
-├── evaluation/ metrics, stream error analysis
+├── evaluation/ metrics, quality gates, stream error analysis
 ├── explainability/ SHAP
+├── validation/ data contracts (pandera)
 ├── serving/ FastAPI app + predictor
 └── pipeline/ one CLI entry point per stage, MLflow tracking
-configs/pipeline.yaml all paths, generator and tracking settings
+configs/pipeline.yaml all paths and settings, incl. data contract and gate limits
+configs/*_cases.yaml  golden and behaviour cases for the quality gate
 dvc.yaml / dvc.lock   versioned pipeline and the exact data hashes
-tests/ contract, generator, online-feature and API tests
+tests/ contract, generator, online-feature, validation, gate and API tests
 ```
 
 
@@ -130,8 +137,8 @@ model, not a claim about real-world fraud performance.
 | M1 | Reproducible build: packaging, generator, pipeline, Docker, tests | ✅ Done |
 | M2 | Real-time scoring: online features, leak-free training, `/score` | ✅ Done |
 | M3 | Experiment tracking and data versioning (MLflow, DVC) | ✅ Done |
-| M4 | Data validation and ML-specific tests | Next |
-| M5 | Model registry and promotion gates | |
+| M4 | Data validation and ML-specific tests | ✅ Done |
+| M5 | Model registry and promotion gates | Next |
 | M6 | CI/CD and cloud deployment | |
 | M7 | Monitoring and drift detection | |
 | M8 | Automated retraining | |

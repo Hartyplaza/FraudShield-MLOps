@@ -24,7 +24,8 @@ def main() -> None:
     paths = cfg["paths"]
 
     df = pd.read_csv(paths["features"], parse_dates=["timestamp"])
-    result = train(df, model_dir=paths["model_dir"])
+    result = train(df, model_dir=paths["model_dir"],
+                   min_precision=cfg["training"]["min_precision"])
 
     model_dir = Path(paths["model_dir"])
     shutil.copy(paths["encoders"], model_dir / "encoders.json")

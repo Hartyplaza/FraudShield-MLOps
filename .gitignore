@@ -26,6 +26,8 @@ mlflow.db
 models/
 reports/*
 !reports/metrics.json
+!reports/gate.json
+!reports/seeds.json
 
 # Testing and tooling
 .pytest_cache/

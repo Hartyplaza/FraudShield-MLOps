@@ -19,6 +19,10 @@ stages:
       - src/fraudshield/ingestion
       - src/fraudshield/pipeline/ingest.py
       - src/fraudshield/pipeline/config.py
+      - src/fraudshield/validation
+    params:
+      - configs/pipeline.yaml:
+          - validation
     outs:
       - data/interim/clean.csv
 
@@ -29,6 +33,10 @@ stages:
       - src/fraudshield/labelling
       - src/fraudshield/pipeline/label.py
       - src/fraudshield/pipeline/config.py
+      - src/fraudshield/validation
+    params:
+      - configs/pipeline.yaml:
+          - validation
     outs:
       - data/interim/labelled.csv
 
@@ -39,6 +47,10 @@ stages:
       - src/fraudshield/features
       - src/fraudshield/pipeline/features.py
       - src/fraudshield/pipeline/config.py
+      - src/fraudshield/validation
+    params:
+      - configs/pipeline.yaml:
+          - validation
     outs:
       - data/processed/features.csv
       - data/processed/encoders.json
@@ -55,8 +67,48 @@ stages:
       - src/fraudshield/evaluation/threshold_tuner.py
       - src/fraudshield/pipeline/train.py
       - src/fraudshield/pipeline/config.py
+    params:
+      - configs/pipeline.yaml:
+          - training
     outs:
       - models
     metrics:
       - reports/metrics.json:
+          cache: false
+
+  gate:
+    cmd: python -m fraudshield.pipeline.gate --config configs/pipeline.yaml
+    deps:
+      - models
+      - reports/metrics.json
+      - configs/golden_cases.yaml
+      - configs/behaviour_cases.yaml
+      - src/fraudshield/evaluation/gates.py
+      - src/fraudshield/pipeline/gate.py
+      - src/fraudshield/serving
+    params:
+      - configs/pipeline.yaml:
+          - gates
+    metrics:
+      - reports/gate.json:
+          cache: false
+
+  seeds:
+    cmd: python -m fraudshield.pipeline.seeds --config configs/pipeline.yaml
+    deps:
+      - models
+      - src/fraudshield/data
+      - src/fraudshield/ingestion
+      - src/fraudshield/labelling
+      - src/fraudshield/features
+      - src/fraudshield/evaluation/metrics.py
+      - src/fraudshield/evaluation/threshold_tuner.py
+      - src/fraudshield/pipeline/seeds.py
+    params:
+      - configs/pipeline.yaml:
+          - generator
+          - training
+          - seeds
+    metrics:
+      - reports/seeds.json:
           cache: false

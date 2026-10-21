@@ -2,7 +2,7 @@
 src/fraudshield/features/engineer.py
 
 Feature engineering pipeline for fraud detection.
-Builds 29 features across 6 groups from the cleaned, labelled DataFrame.
+Builds 27 features across 6 groups from the cleaned, labelled DataFrame.
 
 Feature groups:
     1. Temporal          - hour, day_of_week, is_night, is_weekend, is_business_hours
@@ -25,7 +25,7 @@ HIGH_AMOUNT_THRESHOLD = 4000.0
 RISKY_TYPES = {"cashout", "transfer", "withdrawal"}
 VELOCITY_WINDOWS      = ["1D", "7D", "30D"]
 
-# Exact 29 feature columns the model expects at inference time
+# Exact 27 feature columns the model expects at inference time
 FEATURE_COLS = [
     # Temporal
     "hour", "day_of_week", "is_night", "is_weekend", "is_business_hours",
@@ -41,7 +41,8 @@ FEATURE_COLS = [
     "location_missing", "device_missing",
     # Encoded categoricals
     "txn_type_encoded", "location_encoded", "device_encoded",
-    "log_format_encoded", "currency_encoded",
+    # log_format and currency are left out on purpose: they describe how a log
+    # line was written, not the transaction (see behaviour gate, M4)
 ]
 
 
@@ -217,7 +218,7 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         df: cleaned, labelled DataFrame sorted by user_id + timestamp
 
     Returns:
-        DataFrame with all 29 engineered features added.
+        DataFrame with all 27 engineered features added.
         Original columns are preserved alongside new feature columns.
     """
     logger.info("Building feature matrix...")
