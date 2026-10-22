@@ -43,14 +43,20 @@ def git_dirty() -> str:
     return str(bool(out.strip())).lower()
 
 
+def connect(cfg: dict) -> None:
+    """Point MLflow at the tracking store and experiment from the config."""
+    tracking = cfg.get("tracking", {})
+    if "MLFLOW_TRACKING_URI" not in os.environ:
+        mlflow.set_tracking_uri(tracking.get("uri", "sqlite:///mlflow.db"))
+    mlflow.set_experiment(tracking.get("experiment", "fraudshield"))
+
+
 def log_run(cfg: dict, result: dict, report: dict) -> str | None:
     """Log a finished training run. Returns the run id, or None if disabled."""
     tracking = cfg.get("tracking", {})
     if not tracking.get("enabled", True):
         return None
-    if "MLFLOW_TRACKING_URI" not in os.environ:
-        mlflow.set_tracking_uri(tracking.get("uri", "sqlite:///mlflow.db"))
-    mlflow.set_experiment(tracking.get("experiment", "fraudshield"))
+    connect(cfg)
 
     paths, gen = cfg["paths"], cfg["generator"]
     model_dir = Path(paths["model_dir"])

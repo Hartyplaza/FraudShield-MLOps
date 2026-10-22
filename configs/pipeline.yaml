@@ -28,6 +28,8 @@ paths:
   metrics: reports/metrics.json
   gate: reports/gate.json
   seeds: reports/seeds.json
+  registry: reports/registry.json
+  promotions: reports/promotions.jsonl
 
 tracking:
   enabled: true
@@ -41,6 +43,14 @@ training:
 seeds:
   # Generator seeds for the robustness check (42 is the training data)
   seeds: [1, 2, 3, 4, 5, 6, 7, 8]
+
+registry:
+  model_name: fraudshield
+
+promotion:
+  # On the same seed datasets, the challenger may trail the champion's mean
+  # PR-AUC by at most this much (seed noise is ~0.02 per dataset)
+  max_pr_auc_drop: 0.005
 
 gates:
   golden_cases: configs/golden_cases.yaml

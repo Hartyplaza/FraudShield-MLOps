@@ -39,7 +39,10 @@ def main() -> None:
     with open(ensure_parent(paths["metrics"]), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
 
-    log_run(cfg, result, report)
+    run_id = log_run(cfg, result, report)
+    if run_id:
+        # The bundle records which run produced it, so it can be registered later
+        (model_dir / "run.json").write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
 
 
 if __name__ == "__main__":

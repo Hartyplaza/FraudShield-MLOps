@@ -112,3 +112,18 @@ stages:
     metrics:
       - reports/seeds.json:
           cache: false
+
+  register:
+    cmd: python -m fraudshield.registry.register --config configs/pipeline.yaml
+    deps:
+      - models
+      - reports/gate.json
+      - reports/seeds.json
+      - src/fraudshield/registry/register.py
+      - src/fraudshield/registry/pyfunc_model.py
+    params:
+      - configs/pipeline.yaml:
+          - registry
+    outs:
+      - reports/registry.json:
+          cache: false
