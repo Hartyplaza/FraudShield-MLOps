@@ -1,5 +1,6 @@
 # docker compose up
-#   1. train: runs the whole pipeline and writes the model to the 'models' volume
+#   1. train: runs the DVC pipeline up to the quality gate; a model is written to
+#             the 'models' volume only if the gate passes
 #   2. api:   starts only after train succeeds, and serves that model read-only
 services:
   train:
@@ -8,8 +9,8 @@ services:
       target: train
     image: fraudshield-train:latest
     volumes:
-      - models:/app/models
-      - reports:/app/reports
+      - models:/out/models
+      - reports:/out/reports
 
   api:
     build:

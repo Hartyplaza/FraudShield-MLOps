@@ -1,6 +1,7 @@
 # FraudShield images, built from one Dockerfile with three stages:
 #   base   -> shared Python runtime + system libraries
-#   train  -> runs the full pipeline (make all) and writes models/ + reports/
+#   train  -> runs the DVC pipeline up to the quality gate, then copies
+#             models/ and reports/ to /out (mounted volumes)
 #   serve  -> FastAPI app that loads a trained model from MODEL_DIR
 
 ARG PYTHON_VERSION=3.12
@@ -42,18 +43,22 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --no-edi
 
 # ---------------------------------------------------------------- train
 FROM base AS train
-RUN apt-get update \
- && apt-get install -y --no-install-recommends make \
- && rm -rf /var/lib/apt/lists/*
 COPY --from=build-train /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-# Makefile, config and src are needed because Make uses them as prerequisites
-COPY Makefile ./
+ENV PATH="/opt/venv/bin:$PATH" \
+    MLFLOW_DISABLE_AGENT_HINT=1
+# The pipeline definition and everything its stages depend on
 COPY configs ./configs
 COPY src ./src
-RUN mkdir -p data models reports && chown -R app:app /app
+COPY dvc.yaml dvc.lock .dvcignore ./
+COPY .dvc/config ./.dvc/config
+# No Git inside the image, so DVC runs without it. Outputs are built inside the
+# container and copied to /out at the end: DVC deletes a stage's outputs before
+# re-running it, which would fail on a mounted volume.
+RUN dvc config core.no_scm true \
+ && mkdir -p /out/models /out/reports \
+ && chown -R app:app /app /out
 USER app
-CMD ["make", "all", "PY=python -m"]
+CMD ["sh", "-c", "dvc repro gate && cp -a models/. /out/models/ && cp -a reports/. /out/reports/"]
 
 # ---------------------------------------------------------------- serve
 FROM base AS serve

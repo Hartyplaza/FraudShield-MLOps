@@ -1,0 +1,101 @@
+# Continuous integration: runs on every push to main and every pull request.
+#
+#   lint-test   ruff + the full test suite
+#   reproduce   rebuilds the whole pipeline from config on a clean machine and
+#               checks the results match the ones committed in reports/
+#   docker      builds both images, trains inside the container (up to the
+#               quality gate), starts the API and scores two transactions
+#
+# The data is synthetic and generated from configs/pipeline.yaml, so CI needs no
+# data store and no secrets.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.12.23"
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install (from the lockfile)
+        run: uv sync --all-extras --frozen
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Test
+        run: uv run pytest -q
+
+  reproduce:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install (from the lockfile)
+        run: uv sync --all-extras --frozen
+      - name: Rebuild the pipeline from scratch (generate -> gate -> seeds)
+        run: uv run dvc repro gate seeds
+      - name: Results must match the committed ones exactly
+        run: |
+          git diff --exit-code reports/metrics.json reports/gate.json reports/seeds.json
+          echo "Reproduced: metrics, quality gate and seed results are identical to the commit."
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: reports/
+
+  docker:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: docker compose build
+      - name: Train in the container, then start the API
+        run: |
+          docker compose up -d
+          for i in $(seq 1 90); do
+            if curl -fs localhost:8000/health; then echo; exit 0; fi
+            train=$(docker compose ps -a train --format '{{.State}} {{.ExitCode}}')
+            case "$train" in
+              "exited 0"|running*|"") ;;
+              exited*) echo "Training container failed: $train"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "API did not become healthy in 15 minutes"; exit 1
+      - name: "Smoke test: one clear fraud, one clear legit transaction"
+        run: |
+          fraud='{"log": "2025-08-02 02:30:00 | user: user7001 | txn: cashout of $4800.00 from London | device: iPhone 13"}'
+          legit='{"log": "2025-08-02 13:00:00 | user: user7002 | txn: purchase of $45.20 from Glasgow | device: iPhone 13"}'
+          curl -fs -X POST localhost:8000/score -H 'Content-Type: application/json' -d "$fraud" | tee /dev/stderr | grep -q '"is_fraud":true'
+          curl -fs -X POST localhost:8000/score -H 'Content-Type: application/json' -d "$legit" | tee /dev/stderr | grep -q '"is_fraud":false'
+          echo "Smoke test passed"
+      - name: Container logs
+        if: always()
+        run: docker compose logs --no-color | tail -100
+      - name: Clean up
+        if: always()
+        run: docker compose down -v
