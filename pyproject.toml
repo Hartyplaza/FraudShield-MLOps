@@ -22,6 +22,7 @@ serve = [
     "uvicorn>=0.54.0",
 ]
 train = [
+    "dvc>=3.67.1",
     "imbalanced-learn>=0.14.2",
     "matplotlib>=3.11.2",
     "mlflow>=3.17.1",
@@ -41,7 +42,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "dvc>=3.67.1",
     "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
