@@ -39,8 +39,10 @@ flowchart LR
     F --> T[train: model search,<br/>precision-target threshold]
     T --> Q{quality gate}
     Q -->|pass| S[seeds: robustness<br/>across 8 datasets]
-    Q -->|pass| M[(model bundle)]
-    M --> A[FastAPI /score, /predict]
+    S --> R[register:<br/>new version = challenger]
+    R --> P{promote: paired<br/>comparison vs champion}
+    P -->|not worse| C[(champion alias)]
+    C --> A[FastAPI /score, /predict]
 ```
 
 | Stage | What it does | Output |
@@ -52,9 +54,12 @@ flowchart LR
 | train | 4-model search, threshold by precision target, MLflow run | `models/`, `reports/metrics.json` |
 | gate | metric limits, golden cases, invariance and directional checks | `reports/gate.json` |
 | seeds | refit the recipe on 8 new datasets | `reports/seeds.json` |
+| register | new registry version, alias `challenger` | `reports/registry.json` |
 
 `uv run dvc repro` runs the stages in order and reruns only those whose inputs
-changed. Any failed check stops the pipeline at that stage.
+changed. Any failed check stops the pipeline at that stage. Promotion to `champion`
+is a separate, deliberate step (`fraudshield.registry.promote`), logged in
+`reports/promotions.jsonl`.
 
 In Docker, a **train** container runs the pipeline once and writes the model to a
 shared volume. The **api** container starts only after training succeeds, and
@@ -85,7 +90,7 @@ commit and data hashes, and `dvc.lock` pins the exact data behind each commit.
 uv sync --all-extras                # install from the lockfile
 RUN_NAME=my-run uv run dvc repro    # run the pipeline; only changed stages rerun
 uv run dvc metrics show             # current metrics
-make test                           # 98 tests
+make test                           # 104 tests
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse runs
 uv run uvicorn fraudshield.serving.api:app --port 8000
 ```
@@ -96,6 +101,14 @@ To keep the data, set up a DVC store once (any folder outside the repo):
 uv run dvc remote add --local -d localstore ~/dvc-store
 uv run dvc push      # save data and model
 uv run dvc pull      # restore them
+```
+
+Model registry and promotion:
+
+```bash
+uv run python -m fraudshield.registry.promote                       # challenger vs champion
+uv run python -m fraudshield.registry.promote --version 1 --force   # roll back to version 1
+MODEL_URI=models:/fraudshield@champion uv run uvicorn fraudshield.serving.api:app --port 8000
 ```
 
 ## Project layout
@@ -110,6 +123,7 @@ src/fraudshield/
 ├── evaluation/ metrics, quality gates, stream error analysis
 ├── explainability/ SHAP
 ├── validation/ data contracts (pandera)
+├── registry/ MLflow registry: register, promote, resolve champion
 ├── serving/ FastAPI app + predictor
 └── pipeline/ one CLI entry point per stage, MLflow tracking
 configs/pipeline.yaml all paths and settings, incl. data contract and gate limits
@@ -138,8 +152,8 @@ model, not a claim about real-world fraud performance.
 | M2 | Real-time scoring: online features, leak-free training, `/score` | ✅ Done |
 | M3 | Experiment tracking and data versioning (MLflow, DVC) | ✅ Done |
 | M4 | Data validation and ML-specific tests | ✅ Done |
-| M5 | Model registry and promotion gates | Next |
-| M6 | CI/CD and cloud deployment | |
+| M5 | Model registry and promotion gates | ✅ Done |
+| M6 | CI/CD and cloud deployment | Next |
 | M7 | Monitoring and drift detection | |
 | M8 | Automated retraining | |
 

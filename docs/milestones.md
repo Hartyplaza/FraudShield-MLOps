@@ -421,3 +421,88 @@ holds results from passing runs.
   exact recipe, not of the whole training procedure (which would include the search).
 - **`/predict` still accepts `log_format_encoded` and `currency_encoded`**; the model
   ignores them, but the request schema should drop them.
+
+## M5 — Model registry and promotion ✅
+
+**Goal:** the model that is served is a named, numbered version with a recorded
+history; a new model replaces it only if it is not worse on the same data; and a bad
+model can be taken out of service in one command.
+
+### What was built
+
+| Component | Details |
+|---|---|
+| Register stage (`registry/register.py`) | After the gate and seed stages, the bundle is logged as an MLflow pyfunc model on its training run, registered as a new version of `fraudshield`, tagged with its gate and seed results, and given the alias `challenger`. Training writes its run id into the bundle (`models/run.json`) so the two can be linked. |
+| Pyfunc wrapper (`registry/pyfunc_model.py`) | Logged as "model from code" (the file, not a pickle). `mlflow.pyfunc.load_model("models:/fraudshield@champion")` scores raw log lines with exactly the same code and results as the API. MLflow also stores the project's `uv.lock` with each version. |
+| Promotion (`registry/promote.py`) | Paired comparison: challenger and champion are refitted on the same 8 seed datasets; the challenger is promoted unless its mean PR-AUC is more than 0.005 below the champion's (`promotion.max_pr_auc_drop`). `--version N --force` skips the comparison (rollback). |
+| Promotion log (`reports/promotions.jsonl`) | Every move of the `champion` alias, with time, from, to and reason, committed to Git. |
+| Serving from the registry (`registry/resolve.py`) | `MODEL_URI=models:/fraudshield@champion` makes the API load whichever version holds the alias; `/health` reports it. Without `MODEL_URI` the API loads a folder, as before. |
+| Tests | 104 total. Registry tests run against a throwaway MLflow store, so they never touch the real one. |
+
+Lifecycle: `dvc repro` (gate → seeds → register as challenger) → `promote` (paired
+comparison) → `champion` alias → API on restart.
+
+### Finding 1: the promotion rule refuses a worse model
+
+A deliberately weak challenger (10 shallow trees) registered alongside the champion:
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| Challenger − champion PR-AUC | −0.108 | −0.173 | −0.054 | −0.071 | −0.128 | −0.056 | −0.023 | −0.079 |
+
+Mean −0.086, worse on 8 of 8: not promoted, with the reason tagged on the version.
+
+### Finding 2: a forced bad deploy, and a one-command rollback
+
+| API serving | Caught | Missed | False alarms |
+|---|---|---|---|
+| Champion (version 1) | 72 | 3 | 6 |
+| Weak model forced to champion (version 2) | **0** | **75** | 0 |
+| `promote --version 1 --force`, restart | back to version 1 | | |
+
+The weak model caught nothing because its bundle carried the good model's 0.90
+threshold, which a 10-tree model never reaches: model and threshold out of step. The
+drill script registered it directly, **bypassing the quality gate**, which would have
+failed it on every golden fraud case. The registry does not yet enforce that only gated
+models can be registered or promoted.
+
+### Finding 3: aliases have no history
+
+After a rollback, a version's earlier promotion reason was overwritten: MLflow keeps
+only the alias's current target. Every move is therefore also appended to
+`reports/promotions.jsonl` in Git:
+
+    {"from": null, "to": 1, "reason": "first champion"}
+    {"from": 1,    "to": 2, "reason": "forced (manual promotion or rollback)"}
+    {"from": 2,    "to": 1, "reason": "forced (manual promotion or rollback)"}
+
+### Problems hit
+
+**1. MLflow 3 will not register a plain folder.** `register_model` on a logged directory
+fails with `Unable to find a logged_model`; it needs an MLflow model. Solved with the
+pyfunc wrapper.
+
+**2. Pipeline dependencies that re-register by accident.** With the promotion setting
+inside `registry:`, or the register stage depending on the whole `registry/` folder,
+changing the promotion rule or adding `promote.py` would have re-run the register stage
+and created a duplicate version. The setting moved to its own `promotion:` section, the
+stage depends only on `register.py` and `pyfunc_model.py`, and `dvc commit -f register`
+recorded the existing output as still valid without re-running it.
+
+**3. A file that was never saved.** `ModuleNotFoundError: fraudshield.registry.register`:
+the file had been pasted into the editor but not saved. `&&` stopped the commit.
+
+### Known issues (carried forward)
+
+- **Anyone can register or force-promote.** Registration and `--force` do not require a
+  passed gate. A production registry would only accept versions that carry a gate
+  result and restrict who can move the champion alias.
+- **The API reads the alias only at startup.** A promotion or rollback takes effect on
+  restart (seconds here); user history in memory restarts from the bundle's state.
+- **Registry and tracking are a local SQLite file.** Docker still serves from a folder;
+  the serve image does not include MLflow. A shared tracking server is needed (M6).
+- **The comparison refits both recipes with today's feature code**, so it assumes both
+  versions' features can still be computed. A version from before a feature change
+  cannot be compared this way.
+- **The challenger alias stays on a rejected version** until the next registration.
+- **No model signature.** MLflow warns that the pyfunc model has no input/output schema.
