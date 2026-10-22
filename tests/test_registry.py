@@ -24,6 +24,7 @@ from fraudshield.registry.promote import (
     set_champion,
 )
 from fraudshield.registry.register import CHALLENGER, register_bundle
+from fraudshield.registry.resolve import resolve_model_dir
 from fraudshield.serving.predictor import FraudPredictor
 from fraudshield.serving.scorer import RawScorer
 
@@ -128,3 +129,17 @@ def test_compare_scores_both_versions_on_the_same_datasets(bundle, tracking):
     table = compare(cfg, "fs", v1, v1)
     # Same version on the same data: the paired difference is exactly zero
     assert len(table) == 1 and table["diff"].iloc[0] == 0
+
+
+# ---------------------------------------------------------------- serving
+def test_api_resolves_the_champion_alias_to_its_bundle(bundle, tracking):
+    model_dir, _ = bundle
+    v1 = register_bundle(str(model_dir), new_run(), "fs", {})
+    v2 = register_bundle(str(model_dir), new_run(), "fs", {})
+    set_champion(tracking, "fs", v1, "first")
+
+    path, version = resolve_model_dir("models:/fs@champion")
+    assert version == str(v1) and (path / "fraudshield_model.joblib").exists()
+
+    set_champion(tracking, "fs", v2, "promoted")
+    assert resolve_model_dir("models:/fs@champion")[1] == str(v2)

@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 VERSION   = "0.1.0"
 MODEL_DIR = os.getenv("MODEL_DIR", "data/processed/")
+# Serve from the model registry instead, e.g. models:/fraudshield@champion
+MODEL_URI = os.getenv("MODEL_URI")
 
 app       = FastAPI(
     title       = "FraudShield V2",
@@ -43,6 +45,7 @@ app       = FastAPI(
 # Single predictor instance — loaded once on startup
 predictor = FraudPredictor(model_dir=MODEL_DIR)
 scorer: RawScorer | None = None
+model_source: str | None = None
 
 
 class RawLog(BaseModel):
@@ -52,8 +55,18 @@ class RawLog(BaseModel):
 @app.on_event("startup")
 def load_model():
     """Load model artefacts when the API starts."""
-    global scorer
+    global scorer, model_source
     scorer = None
+    model_source = f"dir {predictor.model_dir}"
+    if MODEL_URI:
+        from pathlib import Path
+
+        from fraudshield.registry.resolve import resolve_model_dir
+
+        bundle, version = resolve_model_dir(MODEL_URI)
+        predictor.model_dir = Path(bundle)
+        model_source = f"{MODEL_URI} (version {version})"
+        logger.info("Serving %s", model_source)
     try:
         predictor.load()
         logger.info("Model loaded successfully.")
@@ -77,6 +90,7 @@ def health():
         model_loaded = predictor._loaded,
         threshold    = predictor.threshold or 0.0,
         version      = VERSION,
+        model_source = model_source,
     )
 
 
