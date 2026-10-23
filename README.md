@@ -8,11 +8,12 @@ Built milestone by milestone on top of the model from
 [FraudShield V2](https://github.com/Hartyplaza/FraudShield_V2), which covers the
 exploration and modelling. This repository is about the **engineering around the
 model**: packaging, reproducibility, testing, containers, real-time scoring,
-experiment tracking, data versioning, CI/CD and cloud deployment, and (in later
-milestones) monitoring and retraining.
+experiment tracking, data versioning, CI/CD, cloud deployment and drift
+monitoring, and (in a later milestone) automated retraining.
 
 **Live API:** [https://fraudshield-ef2l.onrender.com/docs](https://fraudshield-ef2l.onrender.com/docs) (free tier: the first request after
-15 idle minutes takes about a minute while the service wakes up).
+15 idle minutes takes about a minute while the service wakes up). Drift report
+for recent traffic: [https://fraudshield-ef2l.onrender.com/monitoring/drift](https://fraudshield-ef2l.onrender.com/monitoring/drift).
 
 ## Quickstart
 
@@ -50,10 +51,14 @@ flowchart LR
     F --> T[train: model search,<br/>precision-target threshold]
     T --> Q{quality gate}
     Q -->|pass| S[seeds: robustness<br/>across 8 datasets]
+    Q -->|pass| RF[reference: profile of<br/>unseen traffic]
+    RF --> DD{drift drill: monitor<br/>catches drift, no false alarms}
     S --> R[register:<br/>new version = challenger]
     R --> P{promote: paired<br/>comparison vs champion}
     P -->|not worse| C[(champion alias)]
     C --> A[FastAPI /score, /predict]
+    RF -.-> M["GET /monitoring/drift:<br/>last 1000 vs reference"]
+    A -.-> M
 ```
 
 | Stage | What it does | Output |
@@ -66,6 +71,8 @@ flowchart LR
 | gate | metric limits, golden cases, invariance and directional checks | `reports/gate.json` |
 | seeds | refit the recipe on 8 new datasets | `reports/seeds.json` |
 | register | new registry version, alias `challenger` | `reports/registry.json` |
+| reference | score an unseen stream as the API does; bin every feature and the score | `reports/reference.json` |
+| drift_drill | 20 clean streams must not alert, 4 drift scenarios must | `reports/drift_drill.json` |
 
 `uv run dvc repro` runs the stages in order and reruns only those whose inputs
 changed. Any failed check stops the pipeline at that stage. Promotion to `champion`
@@ -121,7 +128,7 @@ commit and data hashes, and `dvc.lock` pins the exact data behind each commit.
 uv sync --all-extras                # install from the lockfile
 RUN_NAME=my-run uv run dvc repro    # run the pipeline; only changed stages rerun
 uv run dvc metrics show             # current metrics
-make test                           # 106 tests
+make test                           # 121 tests
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse runs
 uv run uvicorn fraudshield.serving.api:app --port 8000
 ```
@@ -139,6 +146,19 @@ Run the deployable image (model already inside, as on Render):
 ```bash
 docker run --rm -e PORT=8080 -p 8080:8080 ghcr.io/hartyplaza/fraudshield-mlops:latest
 ```
+
+Drift drill against any deployment (a clean week, then a drifted one):
+
+```bash
+URL=https://fraudshield-ef2l.onrender.com
+uv run python -m fraudshield.serving.stream_demo --url $URL --seed 8 --n-rows 1300 --days 7
+uv run python -m fraudshield.serving.stream_demo --url $URL --seed 9 --start 2025-08-07 --days 7 \
+  --n-rows 1300 --scenario amounts_x3
+curl -s $URL/monitoring/drift
+```
+
+Start from a fresh service (`requests_since_start` 0 or 2): the window and every
+user's history are in memory, and earlier traffic changes both.
 
 Model registry and promotion:
 
@@ -161,6 +181,7 @@ src/fraudshield/
 ├── explainability/ SHAP
 ├── validation/ data contracts (pandera)
 ├── registry/ MLflow registry: register, promote, resolve champion
+├── monitoring/ drift reference, PSI report, live window, stream scoring
 ├── serving/ FastAPI app + predictor
 └── pipeline/ one CLI entry point per stage, MLflow tracking
 configs/pipeline.yaml all paths and settings, incl. data contract and gate limits
@@ -193,8 +214,8 @@ model, not a claim about real-world fraud performance.
 | M4 | Data validation and ML-specific tests | ✅ Done |
 | M5 | Model registry and promotion gates | ✅ Done |
 | M6 | CI/CD and cloud deployment | ✅ Done |
-| M7 | Monitoring and drift detection | Next |
-| M8 | Automated retraining | |
+| M7 | Monitoring and drift detection | ✅ Done |
+| M8 | Automated retraining | Next |
 
 Full write-up of each milestone, including problems hit and how they were
 solved: **[docs/milestones.md](docs/milestones.md)**.
