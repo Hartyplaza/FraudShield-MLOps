@@ -8,12 +8,23 @@ Built milestone by milestone on top of the model from
 [FraudShield V2](https://github.com/Hartyplaza/FraudShield_V2), which covers the
 exploration and modelling. This repository is about the **engineering around the
 model**: packaging, reproducibility, testing, containers, real-time scoring,
-experiment tracking and data versioning, and (in later milestones) CI/CD,
-monitoring and retraining.
+experiment tracking, data versioning, CI/CD and cloud deployment, and (in later
+milestones) monitoring and retraining.
+
+**Live API:** [https://fraudshield-ef2l.onrender.com/docs](https://fraudshield-ef2l.onrender.com/docs) (free tier: the first request after
+15 idle minutes takes about a minute while the service wakes up).
 
 ## Quickstart
 
-Requires only Git and Docker.
+Try the deployed service:
+
+```bash
+curl -s -X POST https://fraudshield-ef2l.onrender.com/score -H 'Content-Type: application/json' \
+  -d '{"log": "2025-08-02 02:30:00 | user: user7001 | txn: cashout of $4800.00 from London | device: iPhone 13"}'
+# {..., "fraud_probability":0.9882, "is_fraud":true, "risk_level":"critical", ...}
+```
+
+Or run everything locally. Requires only Git and Docker.
 
 ```bash
 git clone https://github.com/Hartyplaza/FraudShield-MLOps
@@ -61,6 +72,26 @@ changed. Any failed check stops the pipeline at that stage. Promotion to `champi
 is a separate, deliberate step (`fraudshield.registry.promote`), logged in
 `reports/promotions.jsonl`.
 
+### Delivery
+
+```mermaid
+flowchart LR
+    PR[pull request] --> LT[lint + 106 tests]
+    LT --> RP[reproduce from scratch:<br/>reports must match Git]
+    LT --> DC[docker compose<br/>smoke test]
+    RP --> IM[build image: trains and<br/>runs the gate inside the build]
+    DC --> IM
+    IM --> ST[image smoke test]
+    ST -->|main only| GH[(GHCR<br/>:sha-xxxxxxx, :latest)]
+    GH --> RD[Render deploy]
+    RD --> LV[wait for /health to report<br/>this commit, then live smoke test]
+```
+
+Every pull request runs the first five steps; a merge to `main` also publishes
+the image and deploys it, about 10 minutes end to end. A model that fails the
+quality gate fails the image build, so it can never be deployed. `/health`
+reports the commit that is live (`"revision"`).
+
 In Docker, a **train** container runs the pipeline once and writes the model to a
 shared volume. The **api** container starts only after training succeeds, and
 mounts the model read-only.
@@ -90,7 +121,7 @@ commit and data hashes, and `dvc.lock` pins the exact data behind each commit.
 uv sync --all-extras                # install from the lockfile
 RUN_NAME=my-run uv run dvc repro    # run the pipeline; only changed stages rerun
 uv run dvc metrics show             # current metrics
-make test                           # 104 tests
+make test                           # 106 tests
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse runs
 uv run uvicorn fraudshield.serving.api:app --port 8000
 ```
@@ -101,6 +132,12 @@ To keep the data, set up a DVC store once (any folder outside the repo):
 uv run dvc remote add --local -d localstore ~/dvc-store
 uv run dvc push      # save data and model
 uv run dvc pull      # restore them
+```
+
+Run the deployable image (model already inside, as on Render):
+
+```bash
+docker run --rm -e PORT=8080 -p 8080:8080 ghcr.io/hartyplaza/fraudshield-mlops:latest
 ```
 
 Model registry and promotion:
@@ -130,6 +167,8 @@ configs/pipeline.yaml all paths and settings, incl. data contract and gate limit
 configs/*_cases.yaml  golden and behaviour cases for the quality gate
 dvc.yaml / dvc.lock   versioned pipeline and the exact data hashes
 tests/ contract, generator, online-feature, validation, gate and API tests
+.github/workflows/ci.yml  CI/CD: test, reproduce, build, publish, deploy
+Dockerfile           train, serve and deployable app images
 ```
 
 
@@ -153,8 +192,8 @@ model, not a claim about real-world fraud performance.
 | M3 | Experiment tracking and data versioning (MLflow, DVC) | ✅ Done |
 | M4 | Data validation and ML-specific tests | ✅ Done |
 | M5 | Model registry and promotion gates | ✅ Done |
-| M6 | CI/CD and cloud deployment | Next |
-| M7 | Monitoring and drift detection | |
+| M6 | CI/CD and cloud deployment | ✅ Done |
+| M7 | Monitoring and drift detection | Next |
 | M8 | Automated retraining | |
 
 Full write-up of each milestone, including problems hit and how they were

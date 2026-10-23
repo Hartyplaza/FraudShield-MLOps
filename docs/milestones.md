@@ -506,3 +506,87 @@ the file had been pasted into the editor but not saved. `&&` stopped the commit.
   cannot be compared this way.
 - **The challenger alias stays on a rejected version** until the next registration.
 - **No model signature.** MLflow warns that the pyfunc model has no input/output schema.
+
+## M6 — CI/CD and cloud deployment ✅
+
+**Goal:** every change is tested, reproduced and packaged automatically; only an image
+whose model passed the quality gate can be deployed; and a merge to `main` reaches a
+public URL with no manual steps, with proof of which commit is live.
+
+### What was built
+
+| Component | Details |
+|---|---|
+| CI workflow (`.github/workflows/ci.yml`) | Five jobs on GitHub Actions. Pull requests run the first four; `main` runs all five. Concurrency group cancels superseded runs; `uv` version pinned. |
+| `lint-test` | `uv sync --frozen` (installs exactly what `uv.lock` pins), ruff, 106 tests. |
+| `reproduce` | Runs the pipeline from an empty checkout (`dvc repro gate seeds`) and fails if `metrics.json`, `gate.json` or `seeds.json` differ from the committed versions. Reports uploaded as an artifact. |
+| `docker` | `docker compose` build and up: the train container runs the pipeline, the API must become healthy, then a fraud and a legitimate transaction are scored. |
+| Deployable image (`Dockerfile`, `app` target) | A `trained` stage runs `dvc repro gate` during the build (DVC in no-Git mode), so **a model that fails the gate fails the build**. The `app` stage copies only the model and reports into the API image: no data, no volumes. Listens on `$PORT`, as cloud hosts require. |
+| `image` | Builds the deployable image, runs it with `PORT=8080`, checks `/health` reports this commit and repeats the smoke test. On `main` only, pushes `ghcr.io/hartyplaza/fraudshield-mlops:sha-<commit>` and `:latest` with `GITHUB_TOKEN`; no stored registry password. |
+| Hosting (Render, free tier) | Web service running the GHCR image, health check on `/health`. Live at [https://fraudshield-ef2l.onrender.com/docs](https://fraudshield-ef2l.onrender.com/docs). `/` redirects to the docs. |
+| `deploy` | On `main` only: calls the Render deploy hook (a repository secret), waits until the live `/health` reports this commit, then runs the smoke test against the public URL. |
+| Live revision | The build passes the commit as `REVISION`; `/health` returns it, so "what is running" is answered by the service itself, not by the dashboard. |
+
+### Finding 1: the pipeline reproduces byte for byte on a clean machine
+
+On a fresh GitHub runner with no data, no cache and no DVC remote, `dvc repro gate seeds`
+regenerated the data, trained, gated and ran the 8-seed check in about 3.5 minutes,
+and the three reports matched the committed ones exactly (`git diff --exit-code`).
+Reproducibility is now checked on every pull request instead of claimed once.
+
+### Finding 2: one merge, about ten minutes, verified live
+
+Run for the merge of PR #11, all jobs green:
+
+| Job | Time |
+|---|---|
+| lint-test | 36s |
+| reproduce / docker (in parallel) | 3m35s / 3m30s |
+| image (build with training, smoke test, publish) | 4m10s |
+| deploy (Render, wait for revision, live smoke test) | 57s |
+
+Afterwards the public `/health` returned `"revision":"a8058a4"`, the merge commit,
+and the live service scored the $4,800 night cashout at 0.9882 (critical) and the
+$45.20 daytime purchase at 0.0000 (low): the same decisions as in CI and locally.
+
+### Finding 3: a merge that did not wait for its checks
+
+PR #10 was merged while its own CI run was still in progress. Nothing broke, because
+the run on `main` repeated every check before publishing, but nothing stopped the
+merge either: the checks were advisory. Branch protection (required status checks
+on `main`) would make them mandatory.
+
+### Problems hit
+
+**1. A colon in a step name.** `name: Smoke test: ...` is invalid YAML; step names
+containing `: ` must be quoted.
+
+**2. No permission to read packages.** `gh api .../packages/...` returned 403: the
+CLI token lacked `read:packages`. `gh auth refresh -s read:packages` added it; on WSL
+the browser does not open, so the device code is entered at github.com/login/device.
+
+**3. Render probing `/`.** The host checks the root URL, which returned 404 on every
+probe. `/` now redirects to `/docs`.
+
+**4. Package visibility.** GHCR packages are private by default, which would make the
+host need credentials. This one inherited public visibility from the repository; a
+logged-out `docker pull` confirmed it.
+
+### Known issues (carried forward)
+
+- **The deployed model is not the registry champion.** The image serves the model
+  trained during its own build; the M5 registry and `champion` alias live in a local
+  SQLite file that CI and Render cannot reach. Connecting them needs a shared
+  tracking server and artifact store.
+- **Free tier sleeps.** After 15 idle minutes the service stops; the next request
+  waits about a minute. User history is held in memory, so it resets on every sleep
+  and deploy.
+- **No branch protection yet** (Finding 3).
+- **Rollback is manual:** point the Render service at an earlier `:sha-<commit>` tag
+  and deploy. Every published commit has its own tag, so any earlier image is
+  available.
+- **The API is public and unauthenticated**, with no rate limiting.
+- **Cloud Run not yet set up** (account verification pending). The image already
+  follows its contract (`$PORT`, stateless start-up), so only the deploy job changes.
+- **CI warnings:** actions on Node 20 (`checkout@v4`, `setup-uv@v6`,
+  `upload-artifact@v4`) and `ubuntu-latest` moving to Ubuntu 26.
