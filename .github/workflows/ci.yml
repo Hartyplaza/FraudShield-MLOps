@@ -5,6 +5,9 @@
 #               checks the results match the ones committed in reports/
 #   docker      builds both images, trains inside the container (up to the
 #               quality gate), starts the API and scores two transactions
+#   image       builds the deployable API image (model trained and gated during
+#               the build), smoke-tests it, and on main publishes it to
+#               GitHub Container Registry as :latest and :sha-<commit>
 #
 # The data is synthetic and generated from configs/pipeline.yaml, so CI needs no
 # data store and no secrets.
@@ -99,3 +102,46 @@ jobs:
       - name: Clean up
         if: always()
         run: docker compose down -v
+
+  image:
+    needs: [reproduce, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image name and tags
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "IMAGE=ghcr.io/${repo}" >> "$GITHUB_ENV"
+          echo "TAG=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - name: Build (trains the model and runs the quality gate inside the build)
+        run: |
+          docker build --target app \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "$IMAGE:$TAG" -t "$IMAGE:latest" .
+      - name: "Smoke test: run the image as a cloud host would ($PORT set)"
+        run: |
+          docker run -d --name api -p 8080:8080 -e PORT=8080 "$IMAGE:$TAG"
+          for i in $(seq 1 30); do
+            if curl -fs localhost:8080/health; then echo; break; fi
+            sleep 2
+          done
+          fraud='{"log": "2025-08-02 02:30:00 | user: user7001 | txn: cashout of $4800.00 from London | device: iPhone 13"}'
+          legit='{"log": "2025-08-02 13:00:00 | user: user7002 | txn: purchase of $45.20 from Glasgow | device: iPhone 13"}'
+          curl -fs -X POST localhost:8080/score -H 'Content-Type: application/json' -d "$fraud" | tee /dev/stderr | grep -q '"is_fraud":true'
+          curl -fs -X POST localhost:8080/score -H 'Content-Type: application/json' -d "$legit" | tee /dev/stderr | grep -q '"is_fraud":false'
+          echo "Image smoke test passed"
+      - name: Container logs
+        if: always()
+        run: docker logs api 2>&1 | tail -50 || true
+      - name: Publish to GitHub Container Registry (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
+          echo "Published $IMAGE:$TAG and $IMAGE:latest"

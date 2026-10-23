@@ -1,8 +1,10 @@
-# FraudShield images, built from one Dockerfile with three stages:
+# FraudShield images, built from one Dockerfile:
 #   base   -> shared Python runtime + system libraries
 #   train  -> runs the DVC pipeline up to the quality gate, then copies
 #             models/ and reports/ to /out (mounted volumes)
 #   serve  -> FastAPI app that loads a trained model from MODEL_DIR
+#   app    -> serve + a model trained and quality-gated during the build:
+#             one self-contained image for deployment (no volumes needed)
 
 ARG PYTHON_VERSION=3.12
 ARG UV_VERSION=0.12.23
@@ -69,5 +71,18 @@ RUN mkdir -p /app/models && chown app:app /app/models
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
-CMD ["uvicorn", "fraudshield.serving.api:app", "--host", "0.0.0.0", "--port", "8000"]
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.getenv('PORT', '8000'), timeout=2)"
+# Cloud hosts (Cloud Run, Render) tell the app which port to use via $PORT
+CMD ["sh", "-c", "exec uvicorn fraudshield.serving.api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+
+# ---------------------------------------------------------------- trained
+# Runs the pipeline during the build. If the quality gate fails, the build fails,
+# so a model that did not pass the gate can never end up in a deployable image.
+FROM train AS trained
+RUN dvc repro gate
+
+# ---------------------------------------------------------------- app
+# The deployable image: the API plus the gated model, nothing to mount.
+FROM serve AS app
+COPY --from=trained --chown=app:app /app/models /app/models
+COPY --from=trained --chown=app:app /app/reports /app/reports
