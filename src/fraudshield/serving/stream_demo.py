@@ -21,11 +21,12 @@ API's drift report after each:
 """
 
 import argparse
+import http.client
 import json
 import logging
+import sys
 import time
-import urllib.error
-import urllib.request
+import urllib.parse
 
 import pandas as pd
 import yaml
@@ -34,17 +35,42 @@ from fraudshield.data.generate import generate
 from fraudshield.ingestion.parser import parse_log_line
 from fraudshield.labelling.label_simulator import simulate_labels
 
+_connections: dict[str, http.client.HTTPConnection] = {}
+ATTEMPTS = 5
+
+
+def request(method: str, url: str, payload: dict | None = None) -> tuple[int, dict]:
+    """One HTTP request over a kept-alive connection (one TLS handshake per run,
+    not per request), retried with backoff on network errors.
+
+    A retried POST may have reached the server before the connection broke, so
+    a transaction can occasionally be scored twice; for a drill that is noise.
+    """
+    parts = urllib.parse.urlsplit(url)
+    body = json.dumps(payload).encode() if payload is not None else None
+    headers = {"Content-Type": "application/json"} if body else {}
+    for attempt in range(ATTEMPTS):
+        try:
+            conn = _connections.get(parts.netloc)
+            if conn is None:
+                cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+                # Generous timeout: a free-tier host can take a minute to wake up
+                conn = _connections[parts.netloc] = cls(parts.netloc, timeout=90)
+            conn.request(method, parts.path or "/", body=body, headers=headers)
+            resp = conn.getresponse()
+            return resp.status, json.loads(resp.read() or b"{}")
+        except (OSError, http.client.HTTPException) as e:
+            _connections.pop(parts.netloc, None)
+            if attempt == ATTEMPTS - 1:
+                raise
+            wait = 2 ** attempt
+            print(f"  network error ({e}); retry {attempt + 1}/{ATTEMPTS - 1} in {wait}s", file=sys.stderr)
+            time.sleep(wait)
+    raise AssertionError("unreachable")
+
 
 def post(url: str, payload: dict) -> tuple[int, dict]:
-    req = urllib.request.Request(
-        url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}
-    )
-    try:
-        # Generous timeout: a free-tier host can take a minute to wake up
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            return resp.status, json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read() or b"{}")
+    return request("POST", url, payload)
 
 
 def build_stream(cfg: dict) -> tuple[list[str], list[str], pd.Series]:
@@ -62,11 +88,7 @@ def build_stream(cfg: dict) -> tuple[list[str], list[str], pd.Series]:
 
 
 def get(url: str) -> tuple[int, dict]:
-    try:
-        with urllib.request.urlopen(url, timeout=90) as resp:
-            return resp.status, json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read() or b"{}")
+    return request("GET", url)
 
 
 def interleave(lines: list[str], rejected: list[str]) -> list[tuple[str, bool]]:
@@ -112,6 +134,8 @@ def main() -> None:
     parser.add_argument("--n-rows", type=int, default=2500)
     parser.add_argument("--every", type=int, default=250, help="print progress every N transactions")
     parser.add_argument("--scenario", help="apply a drift scenario from monitoring.drill.scenarios")
+    parser.add_argument("--skip", type=int, default=0,
+                        help="resume a broken run: skip the first N transactions (already sent)")
     args = parser.parse_args()
     logging.disable(logging.INFO)
 
@@ -128,12 +152,20 @@ def main() -> None:
     print(f"Actual fraud in stream: {int(labels.sum())}; unparseable lines mixed in: {len(rejected)}\n")
 
     tp = fp = fn = 0
-    latencies, caught, refused = [], [], 0
+    latencies, caught, refused, sent_bad = [], [], 0, 0
     i = 0
     for line, valid in interleave(lines, rejected):
+        if i < args.skip:            # resuming: these were sent by the broken run
+            i += valid
+            continue
         t0 = time.perf_counter()
-        status, body = post(f"{args.url}/score", {"log": line})
+        try:
+            status, body = post(f"{args.url}/score", {"log": line})
+        except OSError as e:
+            raise SystemExit(f"\nNetwork down after {i} transactions ({e}). "
+                             f"Resume with the same command plus --skip {i}") from None
         if not valid:
+            sent_bad += 1
             refused += status == 422
             continue
         i += 1
@@ -156,7 +188,7 @@ def main() -> None:
 
     lat = pd.Series(latencies)
     print(f"\nLatency per request: p50 {lat.quantile(0.5):.1f} ms | p95 {lat.quantile(0.95):.1f} ms")
-    print(f"Unparseable lines: {len(rejected)} sent, {refused} refused with 422")
+    print(f"Unparseable lines: {sent_bad} sent, {refused} refused with 422")
     print("\nExamples of fraud caught live:")
     for b in caught:
         print(f"  {b['timestamp']}  {b['user_id']}  {b['txn_type']:<10} {b['amount']:>8.2f}  "
