@@ -122,6 +122,7 @@ jobs:
           docker build --target app \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --build-arg "REVISION=${GITHUB_SHA::7}" \
             -t "$IMAGE:$TAG" -t "$IMAGE:latest" .
       - name: "Smoke test: run the image as a cloud host would ($PORT set)"
         run: |
@@ -130,6 +131,7 @@ jobs:
             if curl -fs localhost:8080/health; then echo; break; fi
             sleep 2
           done
+          curl -fs localhost:8080/health | jq -e --arg r "${GITHUB_SHA::7}" '.revision == $r'
           fraud='{"log": "2025-08-02 02:30:00 | user: user7001 | txn: cashout of $4800.00 from London | device: iPhone 13"}'
           legit='{"log": "2025-08-02 13:00:00 | user: user7002 | txn: purchase of $45.20 from Glasgow | device: iPhone 13"}'
           curl -fs -X POST localhost:8080/score -H 'Content-Type: application/json' -d "$fraud" | tee /dev/stderr | grep -q '"is_fraud":true'
@@ -145,3 +147,44 @@ jobs:
           docker push "$IMAGE:$TAG"
           docker push "$IMAGE:latest"
           echo "Published $IMAGE:$TAG and $IMAGE:latest"
+
+  deploy:
+    # Redeploys the Render service with the image just published, waits until
+    # /health reports this commit, then runs the smoke test against the live URL.
+    # Skipped (with a notice) until the RENDER_DEPLOY_HOOK secret is set.
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      SERVICE_URL: ${{ vars.SERVICE_URL || 'https://fraudshield-ef2l.onrender.com' }}
+    steps:
+      - name: Trigger the Render deploy
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::notice::RENDER_DEPLOY_HOOK secret not set; deploy skipped"
+            echo "SKIP=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          curl -fsS -X POST "$DEPLOY_HOOK" -o /dev/null
+          echo "Deploy requested for revision ${GITHUB_SHA::7}"
+      - name: Wait until this commit is live
+        if: env.SKIP != '1'
+        run: |
+          want="${GITHUB_SHA::7}"
+          for i in $(seq 1 60); do
+            got=$(curl -fs --max-time 60 "$SERVICE_URL/health" | jq -r '.revision // empty' || true)
+            if [ "$got" = "$want" ]; then echo "Live revision: $got"; exit 0; fi
+            echo "Waiting (live: ${got:-none}, expected: $want)"
+            sleep 10
+          done
+          echo "Revision $want not live after 10 minutes"; exit 1
+      - name: "Smoke test: the live service"
+        if: env.SKIP != '1'
+        run: |
+          fraud='{"log": "2025-08-02 02:30:00 | user: user7001 | txn: cashout of $4800.00 from London | device: iPhone 13"}'
+          legit='{"log": "2025-08-02 13:00:00 | user: user7002 | txn: purchase of $45.20 from Glasgow | device: iPhone 13"}'
+          curl -fs -X POST "$SERVICE_URL/score" -H 'Content-Type: application/json' -d "$fraud" | tee /dev/stderr | grep -q '"is_fraud":true'
+          curl -fs -X POST "$SERVICE_URL/score" -H 'Content-Type: application/json' -d "$legit" | tee /dev/stderr | grep -q '"is_fraud":false'
+          echo "Live smoke test passed: $SERVICE_URL"

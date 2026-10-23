@@ -86,3 +86,7 @@ RUN dvc repro gate
 FROM serve AS app
 COPY --from=trained --chown=app:app /app/models /app/models
 COPY --from=trained --chown=app:app /app/reports /app/reports
+# The commit this image was built from; /health reports it as "revision".
+# Last in the file, so changing it never invalidates the cached layers above.
+ARG REVISION=unknown
+ENV APP_REVISION=$REVISION

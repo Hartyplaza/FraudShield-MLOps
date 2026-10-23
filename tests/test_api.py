@@ -105,3 +105,14 @@ def test_batch_of_one(client):
     r = client.post("/predict/batch", json=[VALID_TXN])
     assert r.status_code == 200
     assert r.json()["count"] == 1
+
+
+def test_root_redirects_to_docs(client):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"] == "/docs"
+
+
+def test_health_reports_the_live_revision(client, monkeypatch):
+    monkeypatch.setattr(api, "REVISION", "abc1234")
+    assert client.get("/health").json()["revision"] == "abc1234"
