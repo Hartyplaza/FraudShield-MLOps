@@ -343,8 +343,8 @@ stages:
       size: 2311
     - path: src/fraudshield/serving
       hash: md5
-      md5: a66ac9890b326e763bcb7ee37d770ba7.dir
-      size: 20441
+      md5: 03cbdb2867907c39500907cc49c2e230.dir
+      size: 20852
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -495,3 +495,244 @@ stages:
       hash: md5
       md5: dd46a3b9c2fb5b83c4ba9f61e25464b0
       size: 117
+  reference:
+    cmd: python -m fraudshield.pipeline.reference --config configs/pipeline.yaml
+    deps:
+    - path: models
+      hash: md5
+      md5: e54544bced31cd36acf2473f3e592687.dir
+      size: 1463734
+      nfiles: 7
+    - path: src/fraudshield/data
+      hash: md5
+      md5: dce11c6258e6502a72de618cf53ba3a2.dir
+      size: 5758
+      nfiles: 3
+    - path: src/fraudshield/features
+      hash: md5
+      md5: 88117955504db94b2ddb51bbb2466936.dir
+      size: 15133
+      nfiles: 3
+    - path: src/fraudshield/ingestion
+      hash: md5
+      md5: 54e54cf7468e8d00c6e58032126c7bac.dir
+      size: 8998
+      nfiles: 3
+    - path: src/fraudshield/labelling
+      hash: md5
+      md5: 27d4226256aecc10c8634edb21d3849c.dir
+      size: 3505
+      nfiles: 2
+    - path: src/fraudshield/monitoring
+      hash: md5
+      md5: e96a914eba611c7fbcd260a3733d5186.dir
+      size: 8482
+      nfiles: 3
+    - path: src/fraudshield/pipeline/reference.py
+      hash: md5
+      md5: 3acd81e1e98f1be2166102ed34b3dea9
+      size: 1408
+    - path: src/fraudshield/serving
+      hash: md5
+      md5: 03cbdb2867907c39500907cc49c2e230.dir
+      size: 20852
+      nfiles: 6
+    params:
+      configs/pipeline.yaml:
+        generator:
+          profile: assessment
+          seed: 42
+          n_rows: 10000
+          n_users: 86
+          start: '2025-06-01'
+          days: 60
+          null_rate: 0.112
+          malformed_rate: 0.11
+          location_missing_rate: 0.125
+          device_missing_rate: 0.139
+          amount_min: 1.0
+          amount_max: 5000.0
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          locations:
+          - Birmingham
+          - Cardiff
+          - Glasgow
+          - Leeds
+          - Liverpool
+          - London
+          - Manchester
+          devices:
+          - Huawei P30
+          - iPhone 13
+          - Nokia 3310
+          - Pixel 6
+          - Samsung Galaxy S10
+          - Xiaomi Mi 11
+          currencies:
+          - €
+          - £
+          - $
+        monitoring.reference:
+          seed: 7
+          start: '2025-07-31'
+          days: 14
+          n_rows: 2500
+    outs:
+    - path: reports/reference.json
+      hash: md5
+      md5: 6dbb6dbaa9b30d1b7727e59b7c2450f1
+      size: 9813
+  drift_drill:
+    cmd: python -m fraudshield.pipeline.drift_drill --config 
+      configs/pipeline.yaml
+    deps:
+    - path: models
+      hash: md5
+      md5: e54544bced31cd36acf2473f3e592687.dir
+      size: 1463734
+      nfiles: 7
+    - path: reports/reference.json
+      hash: md5
+      md5: 6dbb6dbaa9b30d1b7727e59b7c2450f1
+      size: 9813
+    - path: src/fraudshield/data
+      hash: md5
+      md5: dce11c6258e6502a72de618cf53ba3a2.dir
+      size: 5758
+      nfiles: 3
+    - path: src/fraudshield/features
+      hash: md5
+      md5: 88117955504db94b2ddb51bbb2466936.dir
+      size: 15133
+      nfiles: 3
+    - path: src/fraudshield/ingestion
+      hash: md5
+      md5: 54e54cf7468e8d00c6e58032126c7bac.dir
+      size: 8998
+      nfiles: 3
+    - path: src/fraudshield/labelling
+      hash: md5
+      md5: 27d4226256aecc10c8634edb21d3849c.dir
+      size: 3505
+      nfiles: 2
+    - path: src/fraudshield/monitoring
+      hash: md5
+      md5: e96a914eba611c7fbcd260a3733d5186.dir
+      size: 8482
+      nfiles: 3
+    - path: src/fraudshield/pipeline/drift_drill.py
+      hash: md5
+      md5: 80a765c8a55adc6f4033d6c86e741f0e
+      size: 4728
+    - path: src/fraudshield/serving
+      hash: md5
+      md5: 03cbdb2867907c39500907cc49c2e230.dir
+      size: 20852
+      nfiles: 6
+    params:
+      configs/pipeline.yaml:
+        generator:
+          profile: assessment
+          seed: 42
+          n_rows: 10000
+          n_users: 86
+          start: '2025-06-01'
+          days: 60
+          null_rate: 0.112
+          malformed_rate: 0.11
+          location_missing_rate: 0.125
+          device_missing_rate: 0.139
+          amount_min: 1.0
+          amount_max: 5000.0
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          locations:
+          - Birmingham
+          - Cardiff
+          - Glasgow
+          - Leeds
+          - Liverpool
+          - London
+          - Manchester
+          devices:
+          - Huawei P30
+          - iPhone 13
+          - Nokia 3310
+          - Pixel 6
+          - Samsung Galaxy S10
+          - Xiaomi Mi 11
+          currencies:
+          - €
+          - £
+          - $
+        monitoring:
+          reference:
+            seed: 7
+            start: '2025-07-31'
+            days: 14
+            n_rows: 2500
+          window: 1000
+          min_samples: 1000
+          psi_warn: 0.1
+          psi_alert: 0.25
+          max_flag_rate_ratio: 2.0
+          max_unparseable_increase: 0.05
+          report_only:
+          - user_mean_amount
+          - user_max_amount
+          - user_std_amount
+          drill:
+            clean_seeds:
+            - 8
+            - 9
+            - 10
+            - 11
+            - 12
+            - 13
+            - 14
+            - 15
+            - 16
+            - 17
+            - 18
+            - 19
+            - 20
+            - 21
+            - 22
+            - 23
+            - 24
+            - 25
+            - 26
+            - 27
+            seed: 8
+            scenarios:
+              amounts_x3:
+                amount_max: 15000.0
+              location_missing_50pct:
+                location_missing_rate: 0.5
+              new_device_models:
+                devices:
+                - Pixel 9
+                - iPhone 16
+                - Galaxy S24
+              broken_log_format:
+                malformed_rate: 0.4
+    outs:
+    - path: reports/drift_drill.json
+      hash: md5
+      md5: 25b83268fa1a3c4046bf190cc95c12d9
+      size: 1669
