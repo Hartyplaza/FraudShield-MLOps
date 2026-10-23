@@ -343,8 +343,8 @@ stages:
       size: 2311
     - path: src/fraudshield/serving
       hash: md5
-      md5: a66ac9890b326e763bcb7ee37d770ba7.dir
-      size: 20441
+      md5: 03cbdb2867907c39500907cc49c2e230.dir
+      size: 20852
       nfiles: 6
     params:
       configs/pipeline.yaml:
