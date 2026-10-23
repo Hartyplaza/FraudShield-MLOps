@@ -1,10 +1,11 @@
 """
 src/fraudshield/serving/api.py
 
-FraudShield V2 — FastAPI serving endpoint.
+FraudShield-MLOps — FastAPI serving endpoint.
 
 Endpoints:
-    GET  /health    — liveness check + model status
+    GET  /          — redirects to the interactive docs (/docs)
+    GET  /health    — liveness check + model status + live commit
     POST /predict   — score a single transaction with SHAP explanation
     POST /predict/batch — score multiple transactions
     POST /score     — score one raw log line using each user's history
@@ -19,6 +20,7 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from fraudshield.serving.predictor import FraudPredictor
@@ -33,9 +35,11 @@ VERSION   = "0.1.0"
 MODEL_DIR = os.getenv("MODEL_DIR", "data/processed/")
 # Serve from the model registry instead, e.g. models:/fraudshield@champion
 MODEL_URI = os.getenv("MODEL_URI")
+# Commit the image was built from (set by the Docker build); /health reports it
+REVISION  = os.getenv("APP_REVISION")
 
 app       = FastAPI(
-    title       = "FraudShield V2",
+    title       = "FraudShield-MLOps",
     description = "Real-time fraud detection on transaction logs | Ofigwe Hart",
     version     = VERSION,
     docs_url    = "/docs",
@@ -79,6 +83,11 @@ def load_model():
         logger.warning("Raw-log scoring disabled, feature state missing: %s", e)
 
 
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse("/docs")
+
+
 @app.get("/health", response_model=HealthResponse)
 def health():
     """
@@ -91,6 +100,7 @@ def health():
         threshold    = predictor.threshold or 0.0,
         version      = VERSION,
         model_source = model_source,
+        revision     = REVISION,
     )
 
 

@@ -114,3 +114,4 @@ class HealthResponse(BaseModel):
     threshold    : float
     version      : str
     model_source : str | None = None
+    revision     : str | None = None
