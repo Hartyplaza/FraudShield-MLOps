@@ -96,6 +96,7 @@ jobs:
           legit='{"log": "2025-08-02 13:00:00 | user: user7002 | txn: purchase of $45.20 from Glasgow | device: iPhone 13"}'
           curl -fs -X POST localhost:8000/score -H 'Content-Type: application/json' -d "$fraud" | tee /dev/stderr | grep -q '"is_fraud":true'
           curl -fs -X POST localhost:8000/score -H 'Content-Type: application/json' -d "$legit" | tee /dev/stderr | grep -q '"is_fraud":false'
+          curl -fs localhost:8000/monitoring/drift | tee /dev/stderr | jq -e '.status == "insufficient_data"' > /dev/null
           echo "Smoke test passed"
       - name: Container logs
         if: always()
@@ -137,6 +138,7 @@ jobs:
           legit='{"log": "2025-08-02 13:00:00 | user: user7002 | txn: purchase of $45.20 from Glasgow | device: iPhone 13"}'
           curl -fs -X POST localhost:8080/score -H 'Content-Type: application/json' -d "$fraud" | tee /dev/stderr | grep -q '"is_fraud":true'
           curl -fs -X POST localhost:8080/score -H 'Content-Type: application/json' -d "$legit" | tee /dev/stderr | grep -q '"is_fraud":false'
+          curl -fs localhost:8080/monitoring/drift | tee /dev/stderr | jq -e '.status == "insufficient_data"' > /dev/null
           echo "Image smoke test passed"
       - name: Container logs
         if: always()
@@ -188,4 +190,5 @@ jobs:
           legit='{"log": "2025-08-02 13:00:00 | user: user7002 | txn: purchase of $45.20 from Glasgow | device: iPhone 13"}'
           curl -fs -X POST "$SERVICE_URL/score" -H 'Content-Type: application/json' -d "$fraud" | tee /dev/stderr | grep -q '"is_fraud":true'
           curl -fs -X POST "$SERVICE_URL/score" -H 'Content-Type: application/json' -d "$legit" | tee /dev/stderr | grep -q '"is_fraud":false'
+          curl -fs "$SERVICE_URL/monitoring/drift" | tee /dev/stderr | jq -e '.window == 1000' > /dev/null
           echo "Live smoke test passed: $SERVICE_URL"

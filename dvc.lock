@@ -343,8 +343,8 @@ stages:
       size: 2311
     - path: src/fraudshield/serving
       hash: md5
-      md5: 03cbdb2867907c39500907cc49c2e230.dir
-      size: 20852
+      md5: d69898837083f7f8c2194b259e0c503e.dir
+      size: 25251
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -525,17 +525,17 @@ stages:
       nfiles: 2
     - path: src/fraudshield/monitoring
       hash: md5
-      md5: e96a914eba611c7fbcd260a3733d5186.dir
-      size: 8482
-      nfiles: 3
+      md5: a9175e3372ecb21ee600c3d730e235d6.dir
+      size: 10631
+      nfiles: 4
     - path: src/fraudshield/pipeline/reference.py
       hash: md5
-      md5: 3acd81e1e98f1be2166102ed34b3dea9
-      size: 1408
+      md5: a02fa94b920606e747b7b7ef4dfb385a
+      size: 1595
     - path: src/fraudshield/serving
       hash: md5
-      md5: 03cbdb2867907c39500907cc49c2e230.dir
-      size: 20852
+      md5: d69898837083f7f8c2194b259e0c503e.dir
+      size: 25251
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -580,16 +580,26 @@ stages:
           - €
           - £
           - $
+        monitoring.max_flag_rate_ratio: 2.0
+        monitoring.max_unparseable_increase: 0.05
+        monitoring.min_samples: 1000
+        monitoring.psi_alert: 0.25
+        monitoring.psi_warn: 0.1
         monitoring.reference:
           seed: 7
           start: '2025-07-31'
           days: 14
           n_rows: 2500
+        monitoring.report_only:
+        - user_mean_amount
+        - user_max_amount
+        - user_std_amount
+        monitoring.window: 1000
     outs:
     - path: reports/reference.json
       hash: md5
-      md5: 6dbb6dbaa9b30d1b7727e59b7c2450f1
-      size: 9813
+      md5: 74eca063a1f4e709409d3f5782b33ddc
+      size: 10066
   drift_drill:
     cmd: python -m fraudshield.pipeline.drift_drill --config 
       configs/pipeline.yaml
@@ -601,8 +611,8 @@ stages:
       nfiles: 7
     - path: reports/reference.json
       hash: md5
-      md5: 6dbb6dbaa9b30d1b7727e59b7c2450f1
-      size: 9813
+      md5: 74eca063a1f4e709409d3f5782b33ddc
+      size: 10066
     - path: src/fraudshield/data
       hash: md5
       md5: dce11c6258e6502a72de618cf53ba3a2.dir
@@ -625,17 +635,17 @@ stages:
       nfiles: 2
     - path: src/fraudshield/monitoring
       hash: md5
-      md5: e96a914eba611c7fbcd260a3733d5186.dir
-      size: 8482
-      nfiles: 3
+      md5: a9175e3372ecb21ee600c3d730e235d6.dir
+      size: 10631
+      nfiles: 4
     - path: src/fraudshield/pipeline/drift_drill.py
       hash: md5
       md5: 80a765c8a55adc6f4033d6c86e741f0e
       size: 4728
     - path: src/fraudshield/serving
       hash: md5
-      md5: 03cbdb2867907c39500907cc49c2e230.dir
-      size: 20852
+      md5: d69898837083f7f8c2194b259e0c503e.dir
+      size: 25251
       nfiles: 6
     params:
       configs/pipeline.yaml:

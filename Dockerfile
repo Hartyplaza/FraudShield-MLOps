@@ -60,13 +60,14 @@ RUN dvc config core.no_scm true \
  && mkdir -p /out/models /out/reports \
  && chown -R app:app /app /out
 USER app
-CMD ["sh", "-c", "dvc repro gate && cp -a models/. /out/models/ && cp -a reports/. /out/reports/"]
+CMD ["sh", "-c", "dvc repro gate reference && cp -a models/. /out/models/ && cp -a reports/. /out/reports/"]
 
 # ---------------------------------------------------------------- serve
 FROM base AS serve
 COPY --from=build-serve /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
-    MODEL_DIR=/app/models
+    MODEL_DIR=/app/models \
+    REFERENCE_PATH=/app/reports/reference.json
 RUN mkdir -p /app/models && chown app:app /app/models
 USER app
 EXPOSE 8000
@@ -79,7 +80,7 @@ CMD ["sh", "-c", "exec uvicorn fraudshield.serving.api:app --host 0.0.0.0 --port
 # Runs the pipeline during the build. If the quality gate fails, the build fails,
 # so a model that did not pass the gate can never end up in a deployable image.
 FROM train AS trained
-RUN dvc repro gate
+RUN dvc repro gate reference
 
 # ---------------------------------------------------------------- app
 # The deployable image: the API plus the gated model, nothing to mount.

@@ -9,13 +9,16 @@ Endpoints:
     POST /predict   — score a single transaction with SHAP explanation
     POST /predict/batch — score multiple transactions
     POST /score     — score one raw log line using each user's history
+    GET  /monitoring/drift — recent traffic vs the reference profile (PSI)
 
 Run locally:
     uvicorn fraudshield.serving.api:app --host 0.0.0.0 --port 8000 --reload
 """
 
+import json
 import logging
 import os
+from datetime import UTC, datetime
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -23,6 +26,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+from fraudshield.monitoring.live import LiveMonitor
 from fraudshield.serving.predictor import FraudPredictor
 from fraudshield.serving.schema import FraudResponse, HealthResponse, TransactionRequest
 from fraudshield.serving.scorer import RawScorer, UnparseableLog
@@ -30,6 +34,8 @@ from fraudshield.serving.scorer import RawScorer, UnparseableLog
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+# One JSON line per scored request, for later analysis (stdout: the host keeps the logs)
+prediction_log = logging.getLogger("fraudshield.predictions")
 
 VERSION   = "0.1.0"
 MODEL_DIR = os.getenv("MODEL_DIR", "data/processed/")
@@ -37,6 +43,8 @@ MODEL_DIR = os.getenv("MODEL_DIR", "data/processed/")
 MODEL_URI = os.getenv("MODEL_URI")
 # Commit the image was built from (set by the Docker build); /health reports it
 REVISION  = os.getenv("APP_REVISION")
+# Drift reference profile (built by the pipeline's reference stage)
+REFERENCE_PATH = os.getenv("REFERENCE_PATH", "reports/reference.json")
 
 app       = FastAPI(
     title       = "FraudShield-MLOps",
@@ -49,6 +57,7 @@ app       = FastAPI(
 # Single predictor instance — loaded once on startup
 predictor = FraudPredictor(model_dir=MODEL_DIR)
 scorer: RawScorer | None = None
+monitor: LiveMonitor | None = None
 model_source: str | None = None
 
 
@@ -59,8 +68,14 @@ class RawLog(BaseModel):
 @app.on_event("startup")
 def load_model():
     """Load model artefacts when the API starts."""
-    global scorer, model_source
+    global scorer, model_source, monitor
     scorer = None
+    try:
+        monitor = LiveMonitor.from_file(REFERENCE_PATH)
+        logger.info("Drift monitoring on: window %d, reference %s", monitor.limits["window"], REFERENCE_PATH)
+    except (FileNotFoundError, KeyError) as e:
+        monitor = None
+        logger.warning("Drift monitoring off, no usable reference at %s: %s", REFERENCE_PATH, e)
     model_source = f"dir {predictor.model_dir}"
     if MODEL_URI:
         from pathlib import Path
@@ -179,6 +194,34 @@ def score(body: RawLog):
             detail="Raw-log scoring unavailable: model or feature state not loaded."
         )
     try:
-        return scorer.score(body.log)
+        result, features = scorer.score_with_features(body.log)
     except UnparseableLog as e:
+        if monitor:
+            monitor.record_unparseable()
+        prediction_log.info(json.dumps({"time": _now(), "parsed": False}))
         raise HTTPException(status_code=422, detail=str(e)) from e
+    if monitor:
+        monitor.record(features, result["fraud_probability"])
+    prediction_log.info(json.dumps({
+        "time": _now(), "parsed": True, "revision": REVISION,
+        **{k: result[k] for k in ("user_id", "txn_type", "amount", "fraud_probability", "is_fraud")},
+        "txn_time": str(result["timestamp"]),
+    }))
+    return result
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
+
+
+@app.get("/monitoring/drift")
+def drift():
+    """
+    Compare the last `window` transactions scored by /score with the reference
+    profile: PSI per feature and for the score, flag rate, unparseable share.
+    status is ok, warn, alert or insufficient_data. The window is in memory and
+    starts empty after every restart.
+    """
+    if monitor is None:
+        raise HTTPException(status_code=503, detail="Drift monitoring unavailable: no reference profile loaded.")
+    return monitor.report()

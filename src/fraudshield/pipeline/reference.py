@@ -29,6 +29,8 @@ def main() -> None:
     total = len(stream.features) + stream.unparseable
     reference = build_reference(stream.features, stream.scores, stream.threshold,
                                 unparseable_rate=stream.unparseable / total)
+    # The API reads its window and limits from here, so the file is all it needs
+    reference["limits"] = {k: v for k, v in cfg["monitoring"].items() if k not in ("reference", "drill")}
     save_reference(reference, ensure_parent(paths["reference"]))
     logger.info("Reference built from %d scored transactions (flag rate %.4f, unparseable %.4f)",
                 reference["n"], reference["flag_rate"], reference["unparseable_rate"])

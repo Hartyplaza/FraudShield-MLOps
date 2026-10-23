@@ -47,6 +47,10 @@ class RawScorer:
         return cls(predictor, state)
 
     def score(self, raw_line: str) -> dict:
+        return self.score_with_features(raw_line)[0]
+
+    def score_with_features(self, raw_line: str) -> tuple[dict, dict]:
+        """Score a line; also return the model features, for monitoring."""
         txn = parse_log_line(raw_line)
         if txn is None:
             raise UnparseableLog("Log line does not match any known format")
@@ -65,4 +69,4 @@ class RawScorer:
             "is_fraud": result["is_fraud"][0],
             "risk_level": self.predictor._risk_level(prob),
             "threshold_used": result["threshold_used"],
-        }
+        }, features

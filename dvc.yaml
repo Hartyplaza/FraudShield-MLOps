@@ -143,6 +143,13 @@ stages:
       - configs/pipeline.yaml:
           - generator
           - monitoring.reference
+          - monitoring.window
+          - monitoring.min_samples
+          - monitoring.psi_warn
+          - monitoring.psi_alert
+          - monitoring.max_flag_rate_ratio
+          - monitoring.max_unparseable_increase
+          - monitoring.report_only
     outs:
       - reports/reference.json:
           cache: false

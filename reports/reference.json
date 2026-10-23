@@ -610,5 +610,18 @@
     0.0
    ]
   }
+ },
+ "limits": {
+  "window": 1000,
+  "min_samples": 1000,
+  "psi_warn": 0.1,
+  "psi_alert": 0.25,
+  "max_flag_rate_ratio": 2.0,
+  "max_unparseable_increase": 0.05,
+  "report_only": [
+   "user_mean_amount",
+   "user_max_amount",
+   "user_std_amount"
+  ]
  }
 }
