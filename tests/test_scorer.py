@@ -123,3 +123,14 @@ def test_score_endpoint_returns_a_decision(client, stream, bundle):
 def test_score_endpoint_rejects_garbage(client):
     r = client.post("/score", json={"log": "this is not a transaction"})
     assert r.status_code == 422
+
+def test_scored_requests_feed_the_drift_monitor(client, stream, bundle):
+    line, _ = stream[bundle[1]]
+    client.post("/score", json={"log": line})
+    client.post("/score", json={"log": "this is not a transaction"})
+    r = client.get("/monitoring/drift")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["requests_since_start"] == 2
+    assert body["n"] == 1
+    assert body["status"] == "insufficient_data"

@@ -24,6 +24,7 @@ services:
       MODEL_DIR: /app/models
     volumes:
       - models:/app/models:ro
+      - reports:/app/reports:ro
     ports:
       - "8000:8000"
 

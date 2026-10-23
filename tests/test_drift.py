@@ -6,6 +6,7 @@ import pytest
 
 from fraudshield.features.engineer import FEATURE_COLS
 from fraudshield.monitoring.drift import build_reference, drift_report, proportions, psi
+from fraudshield.monitoring.live import LiveMonitor
 from fraudshield.pipeline.config import load_config
 
 MON = load_config()["monitoring"]
@@ -94,3 +95,37 @@ def test_monitoring_config_names_real_features():
     assert set(MON["report_only"]) <= set(FEATURE_COLS)
     assert MON["min_samples"] <= MON["window"]
     assert MON["psi_warn"] < MON["psi_alert"]
+
+
+def live_monitor(reference, window=200) -> LiveMonitor:
+    return LiveMonitor({**reference, "limits": {**LIMITS, "window": window, "min_samples": window}})
+
+
+def test_live_monitor_keeps_only_the_last_window(reference):
+    monitor = live_monitor(reference)
+    old, _ = traffic(300, seed=1, amount_scale=3.0)      # drifted traffic first...
+    new, scores = traffic(200, seed=2)                    # ...then normal traffic fills the window
+    for row in old.to_dict("records"):
+        monitor.record(row, 0.01)
+    for row, s in zip(new.to_dict("records"), scores, strict=True):
+        monitor.record(row, s)
+    report = monitor.report()
+    assert report["n"] == 200 and report["requests_since_start"] == 500
+    assert "amount" not in report["alerts"]
+
+
+def test_live_monitor_alerts_on_drift_and_on_unparseable_traffic(reference):
+    monitor = live_monitor(reference)
+    features, scores = traffic(200, seed=1, amount_scale=3.0)
+    for row, s in zip(features.to_dict("records"), scores, strict=True):
+        monitor.record(row, s)
+    assert "amount" in monitor.report()["alerts"]
+
+    monitor = live_monitor(reference)
+    features, scores = traffic(200, seed=1)
+    for i, (row, s) in enumerate(zip(features.to_dict("records"), scores, strict=True)):
+        monitor.record(row, s)
+        if i % 2:
+            monitor.record_unparseable()
+    report = monitor.report()
+    assert report["checks"]["unparseable_rate"]["status"] == "alert"

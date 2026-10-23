@@ -116,3 +116,10 @@ def test_root_redirects_to_docs(client):
 def test_health_reports_the_live_revision(client, monkeypatch):
     monkeypatch.setattr(api, "REVISION", "abc1234")
     assert client.get("/health").json()["revision"] == "abc1234"
+
+
+def test_drift_endpoint_without_a_reference_returns_503(model_dir, monkeypatch, tmp_path):
+    monkeypatch.setattr(api, "predictor", FraudPredictor(model_dir=str(model_dir)))
+    monkeypatch.setattr(api, "REFERENCE_PATH", str(tmp_path / "missing.json"))
+    with TestClient(api.app) as c:
+        assert c.get("/monitoring/drift").status_code == 503
