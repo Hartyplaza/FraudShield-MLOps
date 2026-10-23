@@ -590,3 +590,119 @@ logged-out `docker pull` confirmed it.
   follows its contract (`$PORT`, stateless start-up), so only the deploy job changes.
 - **CI warnings:** actions on Node 20 (`checkout@v4`, `setup-uv@v6`,
   `upload-artifact@v4`) and `ubuntu-latest` moving to Ubuntu 26.
+
+## M7 — Monitoring and drift detection ✅
+
+**Goal:** know when the traffic reaching the model no longer looks like the traffic it
+was checked on, before labels arrive (in fraud, chargebacks take weeks), and prove the
+monitor works: it must catch known drift and stay quiet on clean traffic.
+
+### What was built
+
+| Component | Details |
+|---|---|
+| Drift statistics (`monitoring/drift.py`) | Population Stability Index per feature and for the score: deciles for numeric features, one bin per value for codes and flags, plus "missing" and "unseen value" bins. Two more checks: share flagged as fraud (alert if doubled or halved) and share of unparseable lines (alert if up more than 5 points). |
+| Reference stage (`pipeline/reference.py`) | Scores an unseen two-week stream exactly as the API does and saves the bins (`reports/reference.json`, 10 KB, shares only, no transactions). It carries its own window and limits, so the API needs only this file. |
+| Drift drill stage (`pipeline/drift_drill.py`) | Tests the monitor as the gate tests the model. 20 clean streams must raise no alert; 4 drift scenarios must each raise one. Labels are known here, so the report also shows what each drift does to recall. Fails the pipeline otherwise; CI reproduces it byte for byte. |
+| Live window (`monitoring/live.py`) | The API keeps the features and score of the last 1000 transactions it scored, and whether each recent request parsed. |
+| `GET /monitoring/drift` | That window against the reference: `ok`, `warn`, `alert` or `insufficient_data`, with PSI per feature. Checked by all three CI smoke tests. |
+| Prediction log | One JSON line per `/score` request (time, user, type, amount, score, decision, revision) to stdout, kept by the host. |
+| Live drill (`serving/stream_demo.py --scenario`) | Replays a clean or drifted stream against any URL and prints the API's drift report. One kept-alive connection, retries with backoff, `--skip N` to resume. |
+| Tests | 121 total (15 new): PSI and binning, alert logic, report-only features, the rolling window, the endpoint. |
+
+### Finding 1: the monitor catches every drift scenario, and drift is not harm
+
+Offline drill, last 1000 transactions of each stream:
+
+| Stream | Monitor | What fired | Recall |
+|---|---|---|---|
+| 20 clean streams | 0 false alarms (max PSI 0.186) | nothing | 0.965 |
+| Amounts ×3 | alert | `amount`, `txn_sum_*`, flag rate 0.101 vs 0.040 | **0.788** |
+| Location missing 50% | alert | `location_*`, flag rate | 0.976 |
+| New device models | alert | `device_encoded` only | 0.955 |
+| Broken log format | alert | unparseable 46% vs 12%, `txn_count_7d` | 0.951 |
+
+All four raise the same alert, but only the amount shift really costs recall. Drift says
+the inputs changed; it cannot say whether the model is still right. That needs labels.
+
+### Finding 2: short windows raise false alarms by construction
+
+On clean traffic, every 250- and 500-transaction window alerted (140 of 140, 60 of 60).
+The cause was `day_of_week`: a window of about 3 days cannot match a reference spanning
+two weeks (95th-percentile PSI 3.5). With 1000 transactions, about a week, the
+95th-percentile maximum PSI was 0.152 and no window alerted. The window must cover the
+traffic's cycles; for time-of-week features that means at least a week.
+
+### Finding 3: per-user aggregates measure who is active, not drift
+
+With 1000-transaction windows, one clean stream (seed 11) still alerted, on
+`user_mean_amount` (PSI 0.262). Over 60 days of history each user's mean barely moves:
+across all traffic it only spans 2,366 to 2,757. So the feature works as a user
+identifier, and its PSI tracks which users happen to be active. It and
+`user_max_amount`, `user_std_amount` are now reported but never alert; amount drift is
+still caught by `amount`, `amount_z_score`, `is_high_amount` and `txn_sum_*`. Result: 0
+false alarms in 20 clean streams.
+
+### Finding 4: the deployed monitor behaves like the offline one
+
+On Render, from a freshly deployed service (`requests_since_start` 2):
+
+| Live stream (one week, normal rate) | Monitor | Flag rate | Recall |
+|---|---|---|---|
+| Clean | **ok**, no alerts or warnings | 0.040 (reference 0.040) | 0.91 |
+| Amounts ×3 | **alert**: `amount`, `is_high_amount`, `amount_z_score`, `txn_sum_*`, flag rate | 0.081 | 0.73 |
+
+The clean result is identical to the same stream on a local fresh API (40 caught, 4
+missed, 5 false alarms). Median latency per request was about 205 ms from Lagos against
+about 4 ms locally: nearly all network.
+
+### Finding 5: the model's memory carries drift forward
+
+Two earlier live runs went to a service that had not been reset, and the "clean" stream
+alerted on `amount_vs_user_max` and `amount_z_score` with recall 0.80 to 0.84. Replaying
+the same sequence locally reproduced it: the earlier ×3-amount traffic had raised every
+user's max and mean, so normal amounts looked small against them. **Drifted traffic
+keeps hurting after it stops**, until it ages out of the 30-day history.
+
+A related effect: a stream at half the usual rate alerted on every velocity feature
+(`txn_count_*`, `txn_sum_7d`) with recall unchanged at 0.95. Traffic volume is itself a
+model input, so an upstream outage or lost logs would show up as drift.
+
+### Problems hit
+
+**1. Tests before the rebuild.** One API test reads the real `reference.json`; it failed
+until `dvc repro` had added the `limits` section. Correct order: rebuild, then test.
+
+**2. A stale lock since M6.** PR #11 changed API code that the `gate` stage depends on
+without rerunning it; `dvc status` showed it in M7. CI compares the reports, not the
+lock, so it was missed. Rerunning the gate (no retraining) refreshed it.
+
+**3. A flaky connection.** The first live runs died on a DNS failure and a TLS reset:
+the client opened a new HTTPS connection per request, about 1200 handshakes per stream.
+It now keeps one connection, retries with backoff, and prints the `--skip N` to resume.
+
+**4. A reset that did not happen.** The service was believed restarted, but its memory
+was never cleared, and results were wrong in the ways shown in Finding 5. The fix is a
+check, not a habit: `requests_since_start` must be 0 or 2 before a drill. A deploy always
+gives a fresh process.
+
+**5. `gh pr checks` too early.** Run right after `gh pr create`, it reports "no checks"
+and stops an `&&` chain, so a later merge silently did not happen. Wait a few seconds
+before watching checks.
+
+### Known issues (carried forward)
+
+- **The window is in memory.** It empties on every restart, deploy and free-tier sleep
+  (after 15 idle minutes), so with light real traffic it rarely fills to 1000.
+- **Nobody is told.** The drift report is pulled from an endpoint; there is no alert to
+  a person or a channel, and no history of past reports.
+- **No performance monitoring.** Recall is measured only in drills, where labels are
+  known. In production it needs delayed labels joined back to the prediction log.
+- **Report-only features are a blind spot.** A real shift confined to per-user
+  aggregates would not alert.
+- **A retried request can be scored twice** if the first attempt reached the server.
+  Noise for a drill; a real client would need idempotency keys.
+- **The prediction log lives in the host's logs**, with the host's retention; there is
+  no store to analyse it from.
+- **Fixed PSI limits.** They suit this data and window; another dataset would need the
+  clean-stream calibration (Finding 2) repeated.
