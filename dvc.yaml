@@ -127,3 +127,42 @@ stages:
     outs:
       - reports/registry.json:
           cache: false
+
+  reference:
+    cmd: python -m fraudshield.pipeline.reference --config configs/pipeline.yaml
+    deps:
+      - models
+      - src/fraudshield/monitoring
+      - src/fraudshield/pipeline/reference.py
+      - src/fraudshield/data
+      - src/fraudshield/ingestion
+      - src/fraudshield/labelling
+      - src/fraudshield/features
+      - src/fraudshield/serving
+    params:
+      - configs/pipeline.yaml:
+          - generator
+          - monitoring.reference
+    outs:
+      - reports/reference.json:
+          cache: false
+
+  drift_drill:
+    cmd: python -m fraudshield.pipeline.drift_drill --config configs/pipeline.yaml
+    deps:
+      - models
+      - reports/reference.json
+      - src/fraudshield/monitoring
+      - src/fraudshield/pipeline/drift_drill.py
+      - src/fraudshield/data
+      - src/fraudshield/ingestion
+      - src/fraudshield/labelling
+      - src/fraudshield/features
+      - src/fraudshield/serving
+    params:
+      - configs/pipeline.yaml:
+          - generator
+          - monitoring
+    metrics:
+      - reports/drift_drill.json:
+          cache: false

@@ -30,6 +30,8 @@ paths:
   seeds: reports/seeds.json
   registry: reports/registry.json
   promotions: reports/promotions.jsonl
+  reference: reports/reference.json
+  drift_drill: reports/drift_drill.json
 
 tracking:
   enabled: true
@@ -74,3 +76,30 @@ validation:
   txn_types: [cashout, debit, deposit, purchase, refund, top-up, transfer, withdrawal]
   currencies: ["€", "£", "$"]
   log_formats: [arrow_bracket, dash_equals, dmy_triple_colon, pipe_bar, pipe_colon, space_separated, usr_pipe]
+
+monitoring:
+  # Reference traffic: an unseen stream right after the training period, scored
+  # as the API scores it. Live traffic is compared with this profile.
+  reference: {seed: 7, start: "2025-07-31", days: 14, n_rows: 2500}
+  # Compare the last `window` scored transactions. Shorter windows do not cover
+  # a full week, so day_of_week alone raises false alarms (see docs/milestones.md, M7).
+  window: 1000
+  min_samples: 1000
+  psi_warn: 0.10
+  psi_alert: 0.25
+  max_flag_rate_ratio: 2.0         # flag rate more than 2x or less than 1/2 of reference
+  max_unparseable_increase: 0.05   # unparseable share up by more than 5 points
+  # Per-user aggregates over 60 days barely move, so they act as a user identifier:
+  # their PSI tracks which users are active, not how transactions changed. Shown,
+  # never alerted on; amount drift is caught by amount, amount_z_score, txn_sum_*.
+  report_only: [user_mean_amount, user_max_amount, user_std_amount]
+  drill:
+    # Clean streams from these seeds must not raise an alert (false-alarm check)
+    clean_seeds: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+    seed: 8
+    # Each scenario changes the generator; the monitor must raise an alert for all of them
+    scenarios:
+      amounts_x3: {amount_max: 15000.0}
+      location_missing_50pct: {location_missing_rate: 0.5}
+      new_device_models: {devices: [Pixel 9, iPhone 16, Galaxy S24]}
+      broken_log_format: {malformed_rate: 0.4}

@@ -30,6 +30,8 @@ reports/*
 !reports/seeds.json
 !reports/registry.json
 !reports/promotions.jsonl
+!reports/reference.json
+!reports/drift_drill.json
 
 # Testing and tooling
 .pytest_cache/
