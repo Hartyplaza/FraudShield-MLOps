@@ -706,3 +706,116 @@ before watching checks.
   no store to analyse it from.
 - **Fixed PSI limits.** They suit this data and window; another dataset would need the
   clean-stream calibration (Finding 2) repeated.
+
+## M8 — Retraining ✅
+
+**Goal:** when labels for recent traffic arrive, decide whether the model needs to
+change, change it the cheapest way that works, prove the change is safe on old and new
+traffic, and ship it through the same reviewed, reproducible path as any other change.
+
+### What was built
+
+| Component | Details |
+|---|---|
+| Decision rule (`retraining/retrain.py`) | **Harm:** the champion's recall or precision on the last 4 days of the labelled period (never trained on) is clearly below the gate's limits (95% upper bound below the limit). **Candidates, cheapest first:** recalibrate the threshold, or refit the recipe on original plus recent data. **Accept** the first that meets the limits on recent traffic, is not clearly below them on the original test set, and loses at most 0.01 PR-AUC there. Otherwise keep the champion and leave it to a person. |
+| Retrain drill stage (`pipeline/retrain_drill.py`) | Five kinds of recent traffic, each with the expected decision in config; the next two weeks show whether the call was right. Fails the pipeline on any other decision; CI reproduces it. |
+| Proposal (`retraining/propose.py`) | Runs the rule on a newly labelled 30-day period. If it says `retrained`, edits `configs/pipeline.yaml`: the period joins the training data, its traffic becomes the new normal (`monitoring.normal`), and the data contract's amount range is widened if needed, flagged for review. |
+| Workflow (`.github/workflows/retrain.yml`) | Run by hand with the scenario the labels contain. Rebuilds the champion, decides, rebuilds every stage on the proposal and pushes config, `dvc.lock` and reports to a branch. Opening the pull request is the approval; CI then retrains inside the image build and merging deploys. |
+| Windows that follow the training data | The drift reference, both drills and the live demo start the day the training data ends (`training_end`), computed from the config instead of fixed dates. |
+| Lock check (`pipeline/lockcheck.py`) | CI fails a pull request whose `dvc.lock` is behind code (`src/`, `configs/`) or parameters a stage depends on. |
+| Tests | 135 total (14 new): the rule's evidence standard, candidate order, the Wilson bound, config edits that keep comments, the lock check. |
+
+### Finding 1: the old model still ranked drifted fraud; its threshold failed
+
+On two weeks of traffic with amounts up to 3× higher, the champion's PR-AUC stayed at
+0.988, but recall at threshold 0.90 fell to 0.74: drifted frauds scored just under the
+line. That suggested a cheap fix, and it is a trap:
+
+| Candidate | Recent traffic (recall / precision) | Original traffic (recall / precision) |
+|---|---|---|
+| Champion, threshold 0.90 | 0.71 / 1.00 | 0.97 / 0.91 |
+| Recalibrated, threshold 0.26 | 0.97 / 0.90 | 1.00 / **0.64** |
+| Retrained on original + recent | 1.00 / 0.88 | 1.00 / 0.87 |
+
+Recalibration rescues the drifted traffic and floods normal traffic with false alarms.
+Only a candidate checked on both populations is safe.
+
+### Finding 2: four drift alerts, one real problem
+
+| Recent labelled traffic | M7 monitor | M8 decision | Recall, next two weeks |
+|---|---|---|---|
+| Clean | ok | keep | 0.971 |
+| Amounts ×3 | alert | **retrain** (recalibration rejected) | **0.736 → 1.000** |
+| New device models | alert | keep: no clear harm | 0.969 |
+| Location missing 50% | alert | keep | 0.975 |
+| Broken log format | alert | keep | 0.978 |
+
+The monitor says where to look; the labels decide whether to act. Over 8 different
+labelled periods, ×3 amounts led to a retrain 7 times (the eighth was handed to a
+person) and clean traffic never did.
+
+### Finding 3: decisions on a few dozen frauds need an evidence standard
+
+A 4-day holdout of clean traffic held 17 frauds. The champion's precision there was
+0.80 (16 of 20 alerts), below the gate's 0.85, and the first version of the rule called
+that harm. A 95% interval on 20 alerts runs up to 0.92, so the dip proves nothing. Harm
+now needs the upper bound below the limit, and a candidate is rejected on original
+traffic by the same standard. A second instability came from tuning one threshold on
+old and new traffic mixed, where a high-fraud recent period dominates; the threshold now
+has to meet the precision target on each population separately.
+
+### Finding 4: shipping a retrain moves everything downstream
+
+The first full test of a retrain passed the quality gate and broke the rest:
+
+| Problem | Fix |
+|---|---|
+| Drift reference and drills still started on 2025-07-31, so they were scored against histories from their own future: 20 of 20 clean streams false-alarmed | All "after training" windows start at `training_end`, computed from the config |
+| "Clean" still meant the old amounts, so the monitor would alert on accepted traffic forever | `monitoring.normal`: accepting a retrain moves normal; a scenario that is now normal is reported as such, not tested as drift |
+| `txn_sum_30d` still drifted on 1 clean stream in 20: a 14-day period cannot fill a 30-day feature window | The labelled period covers 30 days |
+| Amounts up to 15,000 broke the data contract's 10,000 limit | The proposal widens the range and says so; the reviewer approves it |
+
+A retrain is not only a new model. It is new training data, a new definition of normal
+and, here, a new data contract, so all three go into one reviewed change.
+
+### Finding 5: the loop, live
+
+Retrain workflow (scenario ×3 amounts) → decision `retrained` → branch with three config
+changes and every report rebuilt → pull request #19, CI green → merge → deploy
+(`threshold 0.58`). Then a week of the new normal traffic against the live service:
+
+| Live, a week of traffic with ×3 amounts | Model | Caught | Recall | Precision | Monitor |
+|---|---|---|---|---|---|
+| M7 run | original (threshold 0.90) | — | 0.73 | 0.99 | alert |
+| After the retrain | retrained (threshold 0.58) | 141 of 141 | **1.00** | 0.93 | **ok** (flag rate 0.137 vs 0.135) |
+
+### Problems hit
+
+**1. The lock went stale a third time, and the new check caught it.** Step 2 changed
+code under `serving/` and `data/`, and the instructions reran only the drills.
+`lockcheck` failed it locally before it reached CI: the reason it exists.
+
+**2. Tests that read the live config.** Three tests assumed no retraining periods and an
+empty normal. The first real retrain changed exactly those, and its pull request failed.
+The tests now build their own baseline config.
+
+**3. A bot's branch.** A pull request opened with `GITHUB_TOKEN` does not trigger CI, so
+the workflow pushes a branch and a person opens the pull request: the approval step,
+and the trigger for CI. `gh pr create --fill` needs the branch fetched first.
+
+### Known issues
+
+- **Labels are simulated** and the scenario is chosen by hand. In production the
+  period would come from the prediction log joined with chargebacks, and the run would
+  start when enough labels have arrived.
+- **Training data only grows.** Every accepted period is kept; nothing ages out, so an
+  old regime is never forgotten.
+- **A new normal is accepted whole.** There is no partial acceptance, and only the amount
+  range of the contract is widened automatically; any other contract violation stops the
+  proposal for a person.
+- **The M5 registry is not part of this loop.** The champion is the model built from the
+  committed config; promotion happens by merging, and rollback by reverting the merge.
+- **The retrained model's precision is lower** on the drill's next two weeks (0.87) than
+  the 0.90 target, though above the gate's 0.85: the price of catching every fraud.
+- **One retrain has been demonstrated.** Repeated retrains (several periods, overlapping
+  normals) are tested only by the config-editing tests.
