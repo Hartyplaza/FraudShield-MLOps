@@ -15,6 +15,18 @@ monitoring and a reviewed retraining loop.
 15 idle minutes takes about a minute while the service wakes up). Drift report
 for recent traffic: [https://fraudshield-ef2l.onrender.com/monitoring/drift](https://fraudshield-ef2l.onrender.com/monitoring/drift).
 
+**Highlights**
+
+| | |
+|---|---|
+| Reproducible | CI rebuilds data, model and every report on a clean machine; results must match the committed ones byte for byte |
+| Gated | The model is trained inside the image build; a model that fails the quality gate cannot be deployed |
+| Monitored | Drift monitor tested by a drill: 0 false alarms in 20 clean streams, 4 of 4 drifts caught, same behaviour live |
+| Retrained, with review | Labels confirm harm, the cheapest safe fix is chosen, the change ships as a pull request: live recall on drifted traffic 0.73 → 1.00 ([PR #19](https://github.com/Hartyplaza/FraudShield-MLOps/pull/19)) |
+| Merge to live | About 10 minutes: tests, reproduction, gated image build, deploy, live check |
+
+What each milestone found, including what went wrong: **[docs/milestones.md](docs/milestones.md)**.
+
 ## Quickstart
 
 Try the deployed service:
