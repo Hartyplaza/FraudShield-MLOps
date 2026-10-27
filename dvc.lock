@@ -52,19 +52,24 @@ stages:
           - €
           - £
           - $
-        retraining.periods: []
+        retraining.periods:
+        - seed: 100
+          start: '2025-07-31'
+          days: 30
+          n_rows: 5360
+          amount_max: 15000.0
     outs:
     - path: data/raw/logs.csv
       hash: md5
-      md5: 759303a7218e2eef760d3e2fe979d5c1
-      size: 657331
+      md5: f4cf6714fc1a340b05f559cf14245213
+      size: 1012247
   ingest:
     cmd: python -m fraudshield.pipeline.ingest --config configs/pipeline.yaml
     deps:
     - path: data/raw/logs.csv
       hash: md5
-      md5: 759303a7218e2eef760d3e2fe979d5c1
-      size: 657331
+      md5: f4cf6714fc1a340b05f559cf14245213
+      size: 1012247
     - path: src/fraudshield/ingestion
       hash: md5
       md5: 54e54cf7468e8d00c6e58032126c7bac.dir
@@ -90,7 +95,7 @@ stages:
           min_parse_rate: 0.6
           amount_range:
           - 0.01
-          - 10000
+          - 15000
           fraud_rate:
           - 0.01
           - 0.1
@@ -122,15 +127,15 @@ stages:
     outs:
     - path: data/interim/clean.csv
       hash: md5
-      md5: 2673c6427438677d94859b30455a3c1b
-      size: 634982
+      md5: 9dcea34460cb6b53d90ae468a38b8148
+      size: 978251
   label:
     cmd: python -m fraudshield.pipeline.label --config configs/pipeline.yaml
     deps:
     - path: data/interim/clean.csv
       hash: md5
-      md5: 2673c6427438677d94859b30455a3c1b
-      size: 634982
+      md5: 9dcea34460cb6b53d90ae468a38b8148
+      size: 978251
     - path: src/fraudshield/labelling
       hash: md5
       md5: 27d4226256aecc10c8634edb21d3849c.dir
@@ -156,7 +161,7 @@ stages:
           min_parse_rate: 0.6
           amount_range:
           - 0.01
-          - 10000
+          - 15000
           fraud_rate:
           - 0.01
           - 0.1
@@ -188,15 +193,15 @@ stages:
     outs:
     - path: data/interim/labelled.csv
       hash: md5
-      md5: 67021f4a21fd457492208942ea99ca34
-      size: 650467
+      md5: bc5bba3fe2dc44e173ae766d7fbd4bd9
+      size: 1002058
   features:
     cmd: python -m fraudshield.pipeline.features --config configs/pipeline.yaml
     deps:
     - path: data/interim/labelled.csv
       hash: md5
-      md5: 67021f4a21fd457492208942ea99ca34
-      size: 650467
+      md5: bc5bba3fe2dc44e173ae766d7fbd4bd9
+      size: 1002058
     - path: src/fraudshield/features
       hash: md5
       md5: 88117955504db94b2ddb51bbb2466936.dir
@@ -222,7 +227,7 @@ stages:
           min_parse_rate: 0.6
           amount_range:
           - 0.01
-          - 10000
+          - 15000
           fraud_rate:
           - 0.01
           - 0.1
@@ -258,12 +263,12 @@ stages:
       size: 659
     - path: data/processed/feature_state.joblib
       hash: md5
-      md5: 783f27620490b79595c4577dd74746c0
-      size: 128183
+      md5: 3c64000e9be3bf2e6aa23ab7b8140138
+      size: 137590
     - path: data/processed/features.csv
       hash: md5
-      md5: 89311c96478fe02193b6527e171e3928
-      size: 2026796
+      md5: 2a7b10aa7458c5a3a0048d239ee72b41
+      size: 3130291
   train:
     cmd: python -m fraudshield.pipeline.train --config configs/pipeline.yaml
     deps:
@@ -273,12 +278,12 @@ stages:
       size: 659
     - path: data/processed/feature_state.joblib
       hash: md5
-      md5: 783f27620490b79595c4577dd74746c0
-      size: 128183
+      md5: 3c64000e9be3bf2e6aa23ab7b8140138
+      size: 137590
     - path: data/processed/features.csv
       hash: md5
-      md5: 89311c96478fe02193b6527e171e3928
-      size: 2026796
+      md5: 2a7b10aa7458c5a3a0048d239ee72b41
+      size: 3130291
     - path: src/fraudshield/evaluation/metrics.py
       hash: md5
       md5: 05d69d063e15c639e65a9e28041d661b
@@ -307,13 +312,13 @@ stages:
     outs:
     - path: models
       hash: md5
-      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
-      size: 1463734
+      md5: 3379573629b637f2e800029ef8157188.dir
+      size: 1726231
       nfiles: 7
     - path: reports/metrics.json
       hash: md5
-      md5: 3ab067e5e6ef37a012bf62a027f7bd67
-      size: 214
+      md5: df7aba60e1291e1c831a28a050475f11
+      size: 209
   gate:
     cmd: python -m fraudshield.pipeline.gate --config configs/pipeline.yaml
     deps:
@@ -327,13 +332,13 @@ stages:
       size: 2699
     - path: models
       hash: md5
-      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
-      size: 1463734
+      md5: 3379573629b637f2e800029ef8157188.dir
+      size: 1726231
       nfiles: 7
     - path: reports/metrics.json
       hash: md5
-      md5: 3ab067e5e6ef37a012bf62a027f7bd67
-      size: 214
+      md5: df7aba60e1291e1c831a28a050475f11
+      size: 209
     - path: src/fraudshield/evaluation/gates.py
       hash: md5
       md5: 76fbe853561ceffbf064ea95a5fd19c8
@@ -368,8 +373,8 @@ stages:
     deps:
     - path: models
       hash: md5
-      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
-      size: 1463734
+      md5: 3379573629b637f2e800029ef8157188.dir
+      size: 1726231
       nfiles: 7
     - path: src/fraudshield/data
       hash: md5
@@ -501,8 +506,8 @@ stages:
     deps:
     - path: models
       hash: md5
-      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
-      size: 1463734
+      md5: 3379573629b637f2e800029ef8157188.dir
+      size: 1726231
       nfiles: 7
     - path: src/fraudshield/data
       hash: md5
@@ -584,7 +589,8 @@ stages:
         monitoring.max_flag_rate_ratio: 2.0
         monitoring.max_unparseable_increase: 0.05
         monitoring.min_samples: 1000
-        monitoring.normal: {}
+        monitoring.normal:
+          amount_max: 15000.0
         monitoring.psi_alert: 0.25
         monitoring.psi_warn: 0.1
         monitoring.reference:
@@ -596,25 +602,30 @@ stages:
         - user_max_amount
         - user_std_amount
         monitoring.window: 1000
-        retraining.periods: []
+        retraining.periods:
+        - seed: 100
+          start: '2025-07-31'
+          days: 30
+          n_rows: 5360
+          amount_max: 15000.0
     outs:
     - path: reports/reference.json
       hash: md5
-      md5: 74eca063a1f4e709409d3f5782b33ddc
-      size: 10066
+      md5: 18e197126a0d9e9fee3fcd2e1ef7fc0b
+      size: 10072
   drift_drill:
     cmd: python -m fraudshield.pipeline.drift_drill --config 
       configs/pipeline.yaml
     deps:
     - path: models
       hash: md5
-      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
-      size: 1463734
+      md5: 3379573629b637f2e800029ef8157188.dir
+      size: 1726231
       nfiles: 7
     - path: reports/reference.json
       hash: md5
-      md5: 74eca063a1f4e709409d3f5782b33ddc
-      size: 10066
+      md5: 18e197126a0d9e9fee3fcd2e1ef7fc0b
+      size: 10072
     - path: src/fraudshield/data
       hash: md5
       md5: 391a8d5df04d705be7031aef07bf2835.dir
@@ -693,7 +704,8 @@ stages:
           - £
           - $
         monitoring:
-          normal: {}
+          normal:
+            amount_max: 15000.0
           reference:
             seed: 7
             days: 14
@@ -743,20 +755,25 @@ stages:
                 - Galaxy S24
               broken_log_format:
                 malformed_rate: 0.4
-        retraining.periods: []
+        retraining.periods:
+        - seed: 100
+          start: '2025-07-31'
+          days: 30
+          n_rows: 5360
+          amount_max: 15000.0
     outs:
     - path: reports/drift_drill.json
       hash: md5
-      md5: 25b83268fa1a3c4046bf190cc95c12d9
-      size: 1669
+      md5: 75ba75393e48f66d7bc5b88519c6995c
+      size: 1288
   retrain_drill:
     cmd: python -m fraudshield.pipeline.retrain_drill --config 
       configs/pipeline.yaml
     deps:
     - path: models
       hash: md5
-      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
-      size: 1463734
+      md5: 3379573629b637f2e800029ef8157188.dir
+      size: 1726231
       nfiles: 7
     - path: src/fraudshield/data
       hash: md5
@@ -855,10 +872,16 @@ stages:
             - Galaxy S24
           broken_log_format:
             malformed_rate: 0.4
-        monitoring.normal: {}
+        monitoring.normal:
+          amount_max: 15000.0
         retraining:
           holdout_days: 4
-          periods: []
+          periods:
+          - seed: 100
+            start: '2025-07-31'
+            days: 30
+            n_rows: 5360
+            amount_max: 15000.0
           min_holdout_frauds: 15
           max_base_pr_auc_drop: 0.01
           drill:
@@ -881,5 +904,5 @@ stages:
     outs:
     - path: reports/retrain_drill.json
       hash: md5
-      md5: 4bc5aeca81e9f7b1ea146a5885bdb6af
-      size: 10675
+      md5: 8fd4f9bb2a50978b1c20478a756dd5fa
+      size: 8494
