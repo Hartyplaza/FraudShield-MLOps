@@ -1,14 +1,14 @@
 {
   "best_model": "LightGBM",
-  "threshold": 0.9,
-  "pr_auc": 0.9931,
-  "roc_auc": 0.9997,
-  "f1": 0.9365,
-  "precision": 0.9077,
-  "recall": 0.9672,
-  "fpr": 0.004,
-  "tp": 59,
-  "fp": 6,
-  "fn": 2,
-  "tn": 1481
+  "threshold": 0.58,
+  "pr_auc": 1.0,
+  "roc_auc": 1.0,
+  "f1": 0.9514,
+  "precision": 0.9073,
+  "recall": 1.0,
+  "fpr": 0.0087,
+  "tp": 186,
+  "fp": 19,
+  "fn": 0,
+  "tn": 2175
 }

@@ -68,7 +68,7 @@ gates:
 validation:
   min_rows: 1000
   min_parse_rate: 0.6
-  amount_range: [0.01, 10000]
+  amount_range: [0.01, 15000]
   fraud_rate: [0.01, 0.10]
   max_null_rate:
     location: 0.25
@@ -81,7 +81,7 @@ validation:
 monitoring:
   # Today's normal traffic, as changes to the generator above. Empty: the original
   # traffic. A retraining that accepts a drift as the new normal sets it.
-  normal: {}
+  normal: {amount_max: 15000.0}
   # Reference traffic: an unseen stream right after the training period, scored
   # as the API scores it. Live traffic is compared with this profile.
   # (starts the day the training data ends, so it moves when retraining adds data)
@@ -114,7 +114,8 @@ retraining:
   holdout_days: 4
   # Labelled periods added to the training data by retraining, oldest first. Each is
   # a set of generator settings; the original period is `generator` above.
-  periods: []
+  periods:
+    - {seed: 100, start: '2025-07-31', days: 30, n_rows: 5360, amount_max: 15000.0}
   # Fewer labelled frauds than this in the holdout: too little evidence to act on
   min_holdout_frauds: 15
   # A candidate may trail the champion's PR-AUC on the original test set by at most this
