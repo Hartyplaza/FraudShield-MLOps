@@ -19,7 +19,14 @@ import joblib
 import pandas as pd
 
 from fraudshield.evaluation.gates import ModelQualityError
-from fraudshield.pipeline.config import ensure_parent, stage_args
+from fraudshield.pipeline.config import (
+    ensure_parent,
+    normal_traffic,
+    now_normal,
+    stage_args,
+    training_end,
+    training_periods,
+)
 from fraudshield.retraining.retrain import (
     assess,
     build_split,
@@ -61,12 +68,17 @@ def main() -> None:
     scenarios = {"none": {}, **cfg["monitoring"]["drill"]["scenarios"]}
 
     logging.getLogger("fraudshield").setLevel(logging.WARNING)
-    base = period(cfg["generator"])
+    base = pd.concat([period(p) for p in training_periods(cfg)], ignore_index=True)
+    recent_start, future_start = training_end(cfg), training_end(cfg, plus_days=drill["recent"]["days"])
     report = {}
+    normal = normal_traffic(cfg)
     for name, expected in drill["expect"].items():
         change = scenarios[name]
-        recent = period({**cfg["generator"], **drill["recent"], **change})
-        future = period({**cfg["generator"], **drill["future"], **change})
+        if now_normal(cfg, change):
+            report[name] = {"expected": expected, "decision": "now normal", "skipped": True}
+            continue
+        recent = period({**normal, **drill["recent"], "start": recent_start, **change})
+        future = period({**normal, **drill["future"], "start": future_start, **change})
         split = build_split(base, recent, feature_cols, rt["holdout_days"])
         results = assess(champion, champion_threshold, split, cfg["training"]["min_precision"])
         decision, reason = decide(results, limits)
@@ -83,7 +95,7 @@ def main() -> None:
         }
     logging.getLogger("fraudshield").setLevel(logging.INFO)
 
-    wrong = [n for n, r in report.items() if r["decision"] != r["expected"]]
+    wrong = [n for n, r in report.items() if not r.get("skipped") and r["decision"] != r["expected"]]
     out = {"passed": not wrong, "scenarios": report}
     with open(ensure_parent(paths["retrain_drill"]), "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
@@ -91,6 +103,9 @@ def main() -> None:
     width = max(map(len, report))
     lines = []
     for n, r in report.items():
+        if r.get("skipped"):
+            lines.append(f"  {n:<{width}}  now normal (accepted by a retraining), not tested")
+            continue
         before, after = r["future_champion"], r["future_after_decision"]
         lines.append(f"  {n:<{width}}  {r['decision']:<12} (expected {r['expected']:<12})  next two weeks: "
                      f"recall {before['recall']:.3f} -> {after['recall']:.3f}, "

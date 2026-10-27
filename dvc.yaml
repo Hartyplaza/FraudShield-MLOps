@@ -9,6 +9,7 @@ stages:
     params:
       - configs/pipeline.yaml:
           - generator
+          - retraining.periods
     outs:
       - data/raw/logs.csv
 
@@ -142,6 +143,8 @@ stages:
     params:
       - configs/pipeline.yaml:
           - generator
+          - retraining.periods
+          - monitoring.normal
           - monitoring.reference
           - monitoring.window
           - monitoring.min_samples
@@ -169,6 +172,7 @@ stages:
     params:
       - configs/pipeline.yaml:
           - generator
+          - retraining.periods
           - monitoring
     metrics:
       - reports/drift_drill.json:
@@ -191,6 +195,7 @@ stages:
           - generator
           - training
           - gates.metrics
+          - monitoring.normal
           - monitoring.drill.scenarios
           - retraining
     metrics:

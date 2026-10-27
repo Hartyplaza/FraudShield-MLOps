@@ -12,9 +12,10 @@ have arrived (in fraud, chargebacks confirm labels weeks later).
          recalibrated: the champion with its threshold re-tuned on recent data
          retrained:    the same recipe refitted on the original + recent data
     3. Accept the first candidate that meets the gate's recall and precision
-       limits on BOTH a recent holdout (the last days, never trained on) and the
-       original test set, and is not much worse there in PR-AUC. If none does,
-       keep the champion and leave the call to a person.
+       limits on a recent holdout (the last days, never trained on), is not
+       clearly below them on the original test set (95% upper bound, the same
+       standard of evidence as for harm), and is not much worse there in PR-AUC.
+       If none does, keep the champion and leave the call to a person.
 
 The original test rows are split exactly as in training, so neither model has
 seen them; the recent holdout is the latest `holdout_days`, so the decision is
@@ -28,11 +29,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 
 from fraudshield.data.generate import generate
 from fraudshield.evaluation.metrics import evaluate
-from fraudshield.evaluation.threshold_tuner import tune_threshold_for_precision
 from fraudshield.features.online import CategoryEncoder, FeatureState, replay
 from fraudshield.ingestion.cleaner import clean
 from fraudshield.ingestion.parser import parse_logs
@@ -84,14 +84,18 @@ def build_split(base: pd.DataFrame, recent: pd.DataFrame, feature_cols: list[str
     return Split(X, y, state, base_trainval, base_test, recent_idx[~held], recent_idx[held])
 
 
-def threshold_on(model, X: pd.DataFrame, y: pd.Series, min_precision: float, step: float = 0.01) -> float:
-    """Lowest threshold (highest recall) whose precision on (X, y) meets the target."""
-    p = model.predict_proba(X)[:, 1]
+def lowest_threshold(p: np.ndarray, y: np.ndarray, min_precision: float, step: float = 0.01) -> float:
+    """Lowest threshold (highest recall) at which precision meets the target."""
     for t in np.round(np.arange(step, 1.0, step), 2):
         flagged = p >= t
         if flagged.any() and y[flagged].mean() >= min_precision:
             return float(t)
     return 0.99
+
+
+def threshold_on(model, X: pd.DataFrame, y: pd.Series, min_precision: float) -> float:
+    """Lowest threshold whose precision on (X, y) meets the target, for a fitted model."""
+    return lowest_threshold(model.predict_proba(X)[:, 1], np.asarray(y), min_precision)
 
 
 def candidates(champion, split: Split, min_precision: float) -> dict:
@@ -103,8 +107,15 @@ def candidates(champion, split: Split, min_precision: float) -> dict:
     X_tv, y_tv = split.X.iloc[train_idx], split.y.iloc[train_idx]
     X_fit, _, y_fit, _ = train_test_split(X_tv, y_tv, test_size=0.20, stratify=y_tv, random_state=SPLIT_SEED)
     model = clone(champion).fit(X_fit, y_fit)
+    # Out-of-fold scores; the threshold must meet the precision target on the
+    # original and on the recent traffic separately, not just on their mix
+    # (where a high-fraud recent period would dominate).
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=SPLIT_SEED)
-    threshold = tune_threshold_for_precision(model, X_tv, y_tv, min_precision, cv)
+    oof = cross_val_predict(clone(champion), X_tv, y_tv, cv=cv, method="predict_proba", n_jobs=-1)[:, 1]
+    is_base = np.r_[np.ones(len(split.base_trainval), bool), np.zeros(len(split.recent_train), bool)]
+    y_arr = y_tv.to_numpy()
+    threshold = max(lowest_threshold(oof[is_base], y_arr[is_base], min_precision),
+                    lowest_threshold(oof[~is_base], y_arr[~is_base], min_precision))
     return {"recalibrated": (champion, recalibrated), "retrained": (model, threshold)}
 
 
@@ -154,6 +165,10 @@ def decide(results: dict, limits: dict) -> tuple[str, str]:
         return "keep", (f"no clear harm: champion recall {r['recall']:.3f} (up to {recall_up:.3f}), "
                         f"precision {r['precision']:.3f} (up to {precision_up:.3f}) on recent traffic")
 
+    def clearly_below(s: dict) -> bool:
+        return (wilson_upper(s["tp"], s["tp"] + s["fn"]) < limits["min_recall"]
+                or wilson_upper(s["tp"], s["tp"] + s["fp"]) < limits["min_precision"])
+
     failures = []
     for name, res in results.items():
         if name == "champion":
@@ -162,7 +177,7 @@ def decide(results: dict, limits: dict) -> tuple[str, str]:
         problems = []
         if not meets(res["recent"]):
             problems.append(f"recent recall {res['recent']['recall']:.3f} / precision {res['recent']['precision']:.3f}")
-        if not meets(res["base"]):
+        if clearly_below(res["base"]):
             problems.append(f"original-traffic recall {res['base']['recall']:.3f} / precision {res['base']['precision']:.3f}")
         if drop > limits["max_base_pr_auc_drop"]:
             problems.append(f"original-traffic PR-AUC down {drop:.3f}")
@@ -171,7 +186,7 @@ def decide(results: dict, limits: dict) -> tuple[str, str]:
             return name, (f"harm: champion recall {r['recall']:.3f} (at most {recall_up:.3f}), "
                           f"precision {r['precision']:.3f} (at most {precision_up:.3f}) on recent traffic; "
                           f"{name} recall {c['recall']:.3f}, precision {c['precision']:.3f}, "
-                          f"and meets the limits on original traffic"
+                          f"and is not clearly below the limits on original traffic"
                           + (f"; rejected first: {' | '.join(failures)}" if failures else ""))
         failures.append(f"{name}: " + "; ".join(problems))
     return "keep", "harm, but no candidate meets the limits (" + " | ".join(failures) + "): needs a person"

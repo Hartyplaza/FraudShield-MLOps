@@ -19,7 +19,7 @@ import logging
 from fraudshield.evaluation.gates import ModelQualityError
 from fraudshield.monitoring.drift import drift_report, load_reference
 from fraudshield.monitoring.stream import ScoredStream, score_stream
-from fraudshield.pipeline.config import ensure_parent, stage_args
+from fraudshield.pipeline.config import ensure_parent, now_normal, stage_args
 from fraudshield.pipeline.reference import reference_stream_cfg
 
 logger = logging.getLogger(__name__)
@@ -62,9 +62,11 @@ def main() -> None:
     logging.getLogger("fraudshield").setLevel(logging.WARNING)
     clean = {s: run(reference, score_stream(paths["model_dir"], {**base, "seed": s}), mon)
              for s in drill["clean_seeds"]}
+    # A scenario accepted as the new normal by a retraining is no longer drift
+    normal = [n for n, change in drill["scenarios"].items() if now_normal(cfg, change)]
     scenarios = {name: run(reference, score_stream(paths["model_dir"],
                                                    {**base, "seed": drill["seed"], **change}), mon)
-                 for name, change in drill["scenarios"].items()}
+                 for name, change in drill["scenarios"].items() if name not in normal}
     logging.getLogger("fraudshield").setLevel(logging.INFO)
 
     false_alarms = [s for s, r in clean.items() if r["status"] == "alert"]
@@ -77,16 +79,18 @@ def main() -> None:
         "clean_recall_mean": round(sum(r["recall"] for r in clean.values()) / len(clean), 4),
         "scenarios_detected": len(scenarios) - len(missed),
         "scenarios": scenarios,
+        **({"now_normal": normal} if normal else {}),
     }
     with open(ensure_parent(paths["drift_drill"]), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
 
-    width = max(map(len, scenarios))
+    width = max(map(len, [*scenarios, *normal]))
     clean_label = f"clean ({len(clean)} seeds)"
     lines = [(f"  {clean_label:<{width}}  false alarms {len(false_alarms)}, "
               f"max PSI {report['clean_max_feature_psi']:.3f}, recall {report['clean_recall_mean']:.3f}")]
     lines += [(f"  {n:<{width}}  {r['status']:<5}  recall {r['recall']:.3f}  flag rate {r['flag_rate']:.3f}  "
                f"alerts: {', '.join(r['alerts'][:4])}") for n, r in scenarios.items()]
+    lines += [f"  {n:<{width}}  now normal (accepted by a retraining), not tested as drift" for n in normal]
     summary = "\n".join(lines)
     if not report["passed"]:
         logger.error("Drift drill FAILED (false alarms: %s; missed: %s):\n%s",
