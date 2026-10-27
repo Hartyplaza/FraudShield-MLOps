@@ -8,8 +8,8 @@ Built milestone by milestone on top of the model from
 [FraudShield V2](https://github.com/Hartyplaza/FraudShield_V2), which covers the
 exploration and modelling. This repository is about the **engineering around the
 model**: packaging, reproducibility, testing, containers, real-time scoring,
-experiment tracking, data versioning, CI/CD, cloud deployment and drift
-monitoring, and (in a later milestone) automated retraining.
+experiment tracking, data versioning, CI/CD, cloud deployment, drift
+monitoring and a reviewed retraining loop.
 
 **Live API:** [https://fraudshield-ef2l.onrender.com/docs](https://fraudshield-ef2l.onrender.com/docs) (free tier: the first request after
 15 idle minutes takes about a minute while the service wakes up). Drift report
@@ -59,6 +59,7 @@ flowchart LR
     C --> A[FastAPI /score, /predict]
     RF -.-> M["GET /monitoring/drift:<br/>last 1000 vs reference"]
     A -.-> M
+    T --> RD{retrain drill: right<br/>decision in 5 scenarios}
 ```
 
 | Stage | What it does | Output |
@@ -73,6 +74,7 @@ flowchart LR
 | register | new registry version, alias `challenger` | `reports/registry.json` |
 | reference | score an unseen stream as the API does; bin every feature and the score | `reports/reference.json` |
 | drift_drill | 20 clean streams must not alert, 4 drift scenarios must | `reports/drift_drill.json` |
+| retrain_drill | for 5 kinds of recent labelled traffic, the retraining rule must make the expected call | `reports/retrain_drill.json` |
 
 `uv run dvc repro` runs the stages in order and reruns only those whose inputs
 changed. Any failed check stops the pipeline at that stage. Promotion to `champion`
@@ -83,7 +85,7 @@ is a separate, deliberate step (`fraudshield.registry.promote`), logged in
 
 ```mermaid
 flowchart LR
-    PR[pull request] --> LT[lint + 106 tests]
+    PR[pull request] --> LT[lint, lock check,<br/>135 tests]
     LT --> RP[reproduce from scratch:<br/>reports must match Git]
     LT --> DC[docker compose<br/>smoke test]
     RP --> IM[build image: trains and<br/>runs the gate inside the build]
@@ -99,13 +101,37 @@ the image and deploys it, about 10 minutes end to end. A model that fails the
 quality gate fails the image build, so it can never be deployed. `/health`
 reports the commit that is live (`"revision"`).
 
+### Retraining
+
+```mermaid
+flowchart LR
+    LB[labels arrive for the<br/>30 days after training] --> H{harm? champion clearly<br/>below the gate's limits}
+    H -->|no| K[keep the champion]
+    H -->|yes| CA[candidates, cheapest first:<br/>recalibrate, retrain]
+    CA --> AC{holds on recent AND<br/>original traffic?}
+    AC -->|no| PE[keep; a person decides]
+    AC -->|yes| BR[branch: new training period,<br/>new normal, contract change]
+    BR --> PRR[pull request = approval:<br/>CI retrains, gates, drills]
+    PRR -->|merge| DP[deploy]
+```
+
+Run from **Actions → Retrain** (`.github/workflows/retrain.yml`). A retrain is a
+config change like any other: the training data, the drift reference and the data
+contract all move in one reviewed pull request, and the image is rebuilt from it.
+
 In Docker, a **train** container runs the pipeline once and writes the model to a
 shared volume. The **api** container starts only after training succeeds, and
 mounts the model read-only.
 
 ## Results
 
-Current model (M4): LightGBM, 27 features, threshold 0.90 (highest recall with
+**Current model (M8, after one retraining):** LightGBM, 27 features, trained on the
+original 60 days plus 30 labelled days of traffic with amounts up to 3× higher;
+threshold 0.58. Test set: PR-AUC 1.000, recall 1.000, precision 0.907, false positive
+rate 0.87%. Live, on a week of that traffic: 141 of 141 frauds caught (the original
+model caught 73%), precision 0.93.
+
+**Original model (M4):** LightGBM, 27 features, threshold 0.90 (highest recall with
 precision at least 0.90 on out-of-fold predictions).
 
 | Metric | Training data (seed 42) | Across 8 new datasets (mean ± sd) |
@@ -128,7 +154,7 @@ commit and data hashes, and `dvc.lock` pins the exact data behind each commit.
 uv sync --all-extras                # install from the lockfile
 RUN_NAME=my-run uv run dvc repro    # run the pipeline; only changed stages rerun
 uv run dvc metrics show             # current metrics
-make test                           # 121 tests
+make test                           # 135 tests
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse runs
 uv run uvicorn fraudshield.serving.api:app --port 8000
 ```
@@ -147,18 +173,29 @@ Run the deployable image (model already inside, as on Render):
 docker run --rm -e PORT=8080 -p 8080:8080 ghcr.io/hartyplaza/fraudshield-mlops:latest
 ```
 
-Drift drill against any deployment (a clean week, then a drifted one):
+Drift drill against any deployment (a normal week, then a drifted one; streams start
+the day the training data ends):
 
 ```bash
 URL=https://fraudshield-ef2l.onrender.com
+NEXT=$(uv run python -c "from fraudshield.pipeline.config import load_config, training_end; print(training_end(load_config(), 7))")
 uv run python -m fraudshield.serving.stream_demo --url $URL --seed 8 --n-rows 1300 --days 7
-uv run python -m fraudshield.serving.stream_demo --url $URL --seed 9 --start 2025-08-07 --days 7 \
-  --n-rows 1300 --scenario amounts_x3
+uv run python -m fraudshield.serving.stream_demo --url $URL --seed 9 --start $NEXT --days 7 \
+  --n-rows 1300 --scenario location_missing_50pct
 curl -s $URL/monitoring/drift
 ```
 
 Start from a fresh service (`requests_since_start` 0 or 2): the window and every
 user's history are in memory, and earlier traffic changes both.
+
+Retraining, locally (the workflow runs the same steps):
+
+```bash
+uv run python -m fraudshield.retraining.propose --scenario new_device_models          # decision only
+uv run python -m fraudshield.retraining.propose --scenario amounts_x3 --apply         # edit the config if `retrained`
+uv run dvc repro gate seeds drift_drill retrain_drill                                 # rebuild on the proposal
+uv run python -m fraudshield.pipeline.lockcheck                                       # dvc.lock matches the code
+```
 
 Model registry and promotion:
 
@@ -182,6 +219,7 @@ src/fraudshield/
 ├── validation/ data contracts (pandera)
 ├── registry/ MLflow registry: register, promote, resolve champion
 ├── monitoring/ drift reference, PSI report, live window, stream scoring
+├── retraining/ harm check, candidates, decision; proposal as a config change
 ├── serving/ FastAPI app + predictor
 └── pipeline/ one CLI entry point per stage, MLflow tracking
 configs/pipeline.yaml all paths and settings, incl. data contract and gate limits
@@ -189,6 +227,7 @@ configs/*_cases.yaml  golden and behaviour cases for the quality gate
 dvc.yaml / dvc.lock   versioned pipeline and the exact data hashes
 tests/ contract, generator, online-feature, validation, gate and API tests
 .github/workflows/ci.yml  CI/CD: test, reproduce, build, publish, deploy
+.github/workflows/retrain.yml  retraining proposal, pushed to a branch for review
 Dockerfile           train, serve and deployable app images
 ```
 
@@ -215,7 +254,7 @@ model, not a claim about real-world fraud performance.
 | M5 | Model registry and promotion gates | ✅ Done |
 | M6 | CI/CD and cloud deployment | ✅ Done |
 | M7 | Monitoring and drift detection | ✅ Done |
-| M8 | Automated retraining | Next |
+| M8 | Automated retraining | ✅ Done |
 
 Full write-up of each milestone, including problems hit and how they were
 solved: **[docs/milestones.md](docs/milestones.md)**.
