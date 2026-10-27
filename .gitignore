@@ -32,6 +32,7 @@ reports/*
 !reports/promotions.jsonl
 !reports/reference.json
 !reports/drift_drill.json
+!reports/retrain_drill.json
 
 # Testing and tooling
 .pytest_cache/

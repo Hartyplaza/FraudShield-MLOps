@@ -343,8 +343,8 @@ stages:
       size: 2311
     - path: src/fraudshield/serving
       hash: md5
-      md5: d69898837083f7f8c2194b259e0c503e.dir
-      size: 25251
+      md5: d318505e77e6139ed6c2536851308087.dir
+      size: 26819
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -534,8 +534,8 @@ stages:
       size: 1595
     - path: src/fraudshield/serving
       hash: md5
-      md5: d69898837083f7f8c2194b259e0c503e.dir
-      size: 25251
+      md5: d318505e77e6139ed6c2536851308087.dir
+      size: 26819
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -644,8 +644,8 @@ stages:
       size: 4728
     - path: src/fraudshield/serving
       hash: md5
-      md5: d69898837083f7f8c2194b259e0c503e.dir
-      size: 25251
+      md5: d318505e77e6139ed6c2536851308087.dir
+      size: 26819
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -746,3 +746,137 @@ stages:
       hash: md5
       md5: 25b83268fa1a3c4046bf190cc95c12d9
       size: 1669
+  retrain_drill:
+    cmd: python -m fraudshield.pipeline.retrain_drill --config 
+      configs/pipeline.yaml
+    deps:
+    - path: models
+      hash: md5
+      md5: e54544bced31cd36acf2473f3e592687.dir
+      size: 1463734
+      nfiles: 7
+    - path: src/fraudshield/data
+      hash: md5
+      md5: dce11c6258e6502a72de618cf53ba3a2.dir
+      size: 5758
+      nfiles: 3
+    - path: src/fraudshield/evaluation/metrics.py
+      hash: md5
+      md5: 05d69d063e15c639e65a9e28041d661b
+      size: 2192
+    - path: src/fraudshield/evaluation/threshold_tuner.py
+      hash: md5
+      md5: 415cedb1757603ad26a27523bfca201f
+      size: 4241
+    - path: src/fraudshield/features
+      hash: md5
+      md5: 88117955504db94b2ddb51bbb2466936.dir
+      size: 15133
+      nfiles: 3
+    - path: src/fraudshield/ingestion
+      hash: md5
+      md5: 54e54cf7468e8d00c6e58032126c7bac.dir
+      size: 8998
+      nfiles: 3
+    - path: src/fraudshield/labelling
+      hash: md5
+      md5: 27d4226256aecc10c8634edb21d3849c.dir
+      size: 3505
+      nfiles: 2
+    - path: src/fraudshield/pipeline/retrain_drill.py
+      hash: md5
+      md5: 9cd494bc7467dc5969ac6cdedbd0dea0
+      size: 4645
+    - path: src/fraudshield/retraining
+      hash: md5
+      md5: 717b0d51e44349f038da4d282f86e146.dir
+      size: 8444
+      nfiles: 2
+    params:
+      configs/pipeline.yaml:
+        gates.metrics:
+          min_pr_auc: 0.95
+          min_recall: 0.9
+          min_precision: 0.85
+          max_fpr: 0.01
+        generator:
+          profile: assessment
+          seed: 42
+          n_rows: 10000
+          n_users: 86
+          start: '2025-06-01'
+          days: 60
+          null_rate: 0.112
+          malformed_rate: 0.11
+          location_missing_rate: 0.125
+          device_missing_rate: 0.139
+          amount_min: 1.0
+          amount_max: 5000.0
+          txn_types:
+          - cashout
+          - debit
+          - deposit
+          - purchase
+          - refund
+          - top-up
+          - transfer
+          - withdrawal
+          locations:
+          - Birmingham
+          - Cardiff
+          - Glasgow
+          - Leeds
+          - Liverpool
+          - London
+          - Manchester
+          devices:
+          - Huawei P30
+          - iPhone 13
+          - Nokia 3310
+          - Pixel 6
+          - Samsung Galaxy S10
+          - Xiaomi Mi 11
+          currencies:
+          - €
+          - £
+          - $
+        monitoring.drill.scenarios:
+          amounts_x3:
+            amount_max: 15000.0
+          location_missing_50pct:
+            location_missing_rate: 0.5
+          new_device_models:
+            devices:
+            - Pixel 9
+            - iPhone 16
+            - Galaxy S24
+          broken_log_format:
+            malformed_rate: 0.4
+        retraining:
+          holdout_days: 4
+          min_holdout_frauds: 15
+          max_base_pr_auc_drop: 0.01
+          drill:
+            recent:
+              seed: 9
+              start: '2025-07-31'
+              days: 14
+              n_rows: 2500
+            future:
+              seed: 10
+              start: '2025-08-14'
+              days: 14
+              n_rows: 2500
+            expect:
+              none: keep
+              amounts_x3: retrained
+              new_device_models: keep
+              location_missing_50pct: keep
+              broken_log_format: keep
+        training:
+          min_precision: 0.9
+    outs:
+    - path: reports/retrain_drill.json
+      hash: md5
+      md5: 9c815079034fcc87ff068caaf3b17ebc
+      size: 10661
