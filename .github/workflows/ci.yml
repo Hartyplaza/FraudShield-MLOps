@@ -28,11 +28,11 @@ env:
 
 jobs:
   lint-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -47,11 +47,11 @@ jobs:
 
   reproduce:
     needs: lint-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -66,17 +66,17 @@ jobs:
           echo "Reproduced: metrics, quality gate, seed results and both drills are identical to the commit."
       - name: Keep the reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: reports
           path: reports/
 
   docker:
     needs: lint-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build images
         run: docker compose build
       - name: Train in the container, then start the API
@@ -109,13 +109,13 @@ jobs:
 
   image:
     needs: [reproduce, docker]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Image name and tags
         run: |
           repo="${GITHUB_REPOSITORY,,}"
@@ -159,7 +159,7 @@ jobs:
     # Skipped (with a notice) until the RENDER_DEPLOY_HOOK secret is set.
     needs: image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
