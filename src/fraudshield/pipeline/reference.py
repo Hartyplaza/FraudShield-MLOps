@@ -12,13 +12,19 @@ import logging
 
 from fraudshield.monitoring.drift import build_reference, save_reference
 from fraudshield.monitoring.stream import score_stream
-from fraudshield.pipeline.config import ensure_parent, stage_args
+from fraudshield.pipeline.config import (
+    ensure_parent,
+    normal_traffic,
+    stage_args,
+    training_end,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def reference_stream_cfg(cfg: dict) -> dict:
-    return {**cfg["generator"], **cfg["monitoring"]["reference"]}
+    """The reference period: today's normal traffic, from the day the training data ends."""
+    return {**normal_traffic(cfg), **cfg["monitoring"]["reference"], "start": training_end(cfg)}
 
 
 def main() -> None:
@@ -30,7 +36,7 @@ def main() -> None:
     reference = build_reference(stream.features, stream.scores, stream.threshold,
                                 unparseable_rate=stream.unparseable / total)
     # The API reads its window and limits from here, so the file is all it needs
-    reference["limits"] = {k: v for k, v in cfg["monitoring"].items() if k not in ("reference", "drill")}
+    reference["limits"] = {k: v for k, v in cfg["monitoring"].items() if k not in ("normal", "reference", "drill")}
     save_reference(reference, ensure_parent(paths["reference"]))
     logger.info("Reference built from %d scored transactions (flag rate %.4f, unparseable %.4f)",
                 reference["n"], reference["flag_rate"], reference["unparseable_rate"])

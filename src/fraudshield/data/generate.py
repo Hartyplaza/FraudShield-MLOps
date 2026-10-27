@@ -97,6 +97,11 @@ def main() -> None:
         cfg["n_rows"] = args.n_rows
 
     rows = generate(cfg)
+    with open(args.config, encoding="utf-8") as f:
+        full = yaml.safe_load(f)
+    # Labelled periods added by retraining (configs/pipeline.yaml -> retraining.periods)
+    for extra in full.get("retraining", {}).get("periods", []):
+        rows += generate({**cfg, **extra})
     write_csv(rows, Path(args.out))
     print(f"Wrote {len(rows):,} rows to {args.out} (seed={cfg['seed']})")
 

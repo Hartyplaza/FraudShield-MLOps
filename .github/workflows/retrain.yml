@@ -1,0 +1,80 @@
+# Retraining: run by hand once labels for the period after the training data
+# have arrived (in fraud, chargebacks confirm labels weeks later).
+#
+# Here the labelled period is simulated: choose which drift scenario it contains.
+# The retraining rule (src/fraudshield/retraining/retrain.py) decides. If it says
+# "retrained", the change to configs/pipeline.yaml (new training period, new
+# normal traffic, any data contract change), with every report regenerated, is
+# pushed to a branch. Opening the pull request is the human approval: the usual
+# CI then retrains inside the image build, runs the gate and both drills, and the
+# merge deploys.
+name: Retrain
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Drift scenario in the newly labelled period
+        type: choice
+        options: [none, amounts_x3, location_missing_50pct, new_device_models, broken_log_format]
+        default: none
+
+concurrency:
+  group: retrain
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  UV_VERSION: "0.12.23"
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+  SERVICE_URL: ${{ vars.SERVICE_URL || 'https://fraudshield-ef2l.onrender.com' }}
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install (from the lockfile)
+        run: uv sync --all-extras --frozen
+      - name: Live drift report (context for the decision)
+        run: |
+          {
+            echo "### Live drift report"
+            echo '```'
+            curl -fs --max-time 90 "$SERVICE_URL/monitoring/drift" \
+              | jq '{status, n, requests_since_start, alerts}' || echo "live service unreachable"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Rebuild the current model (the champion)
+        run: uv run dvc repro train
+      - name: Decide
+        id: decide
+        run: uv run python -m fraudshield.retraining.propose --scenario "${{ inputs.scenario }}" --apply
+      - name: Rebuild every stage on the proposed config
+        if: steps.decide.outputs.applied == 'true'
+        run: uv run dvc repro gate seeds drift_drill retrain_drill
+      - name: Push the proposal to a branch
+        if: steps.decide.outputs.applied == 'true'
+        run: |
+          branch="retrain/${{ inputs.scenario }}-${GITHUB_RUN_NUMBER}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add configs/pipeline.yaml dvc.lock reports/
+          git commit -m "Retrain: add a labelled period (${{ inputs.scenario }}) to the training data" \
+                     -m "$(jq -r .reason reports/retrain_decision.json)"
+          git push origin "$branch"
+          {
+            echo "### Proposal pushed to \`$branch\`"
+            echo "Review it, then open the pull request (this runs CI; merging deploys):"
+            echo '```'
+            echo "gh pr create --head $branch --fill"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

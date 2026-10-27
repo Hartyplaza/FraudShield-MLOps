@@ -6,8 +6,8 @@ stages:
     deps:
     - path: src/fraudshield/data
       hash: md5
-      md5: dce11c6258e6502a72de618cf53ba3a2.dir
-      size: 5758
+      md5: 391a8d5df04d705be7031aef07bf2835.dir
+      size: 6038
       nfiles: 3
     params:
       configs/pipeline.yaml:
@@ -52,6 +52,7 @@ stages:
           - €
           - £
           - $
+        retraining.periods: []
     outs:
     - path: data/raw/logs.csv
       hash: md5
@@ -71,8 +72,8 @@ stages:
       nfiles: 3
     - path: src/fraudshield/pipeline/config.py
       hash: md5
-      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
-      size: 1004
+      md5: dd7892fe6376c0ee39b6debc54d456b0
+      size: 2390
     - path: src/fraudshield/pipeline/ingest.py
       hash: md5
       md5: 67e88d9acc764873bbf49638d22521b0
@@ -137,8 +138,8 @@ stages:
       nfiles: 2
     - path: src/fraudshield/pipeline/config.py
       hash: md5
-      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
-      size: 1004
+      md5: dd7892fe6376c0ee39b6debc54d456b0
+      size: 2390
     - path: src/fraudshield/pipeline/label.py
       hash: md5
       md5: acc36bda5bfd1b79016c6218a65b2216
@@ -203,8 +204,8 @@ stages:
       nfiles: 3
     - path: src/fraudshield/pipeline/config.py
       hash: md5
-      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
-      size: 1004
+      md5: dd7892fe6376c0ee39b6debc54d456b0
+      size: 2390
     - path: src/fraudshield/pipeline/features.py
       hash: md5
       md5: 8565d6595d49ff97371433f1faa3e72a
@@ -288,8 +289,8 @@ stages:
       size: 4241
     - path: src/fraudshield/pipeline/config.py
       hash: md5
-      md5: 2ca54d1bd4f9bbde72669ed039a2bb66
-      size: 1004
+      md5: dd7892fe6376c0ee39b6debc54d456b0
+      size: 2390
     - path: src/fraudshield/pipeline/train.py
       hash: md5
       md5: 7ec4f99a581b2c7fdd063e5238e95046
@@ -306,7 +307,7 @@ stages:
     outs:
     - path: models
       hash: md5
-      md5: e54544bced31cd36acf2473f3e592687.dir
+      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
       size: 1463734
       nfiles: 7
     - path: reports/metrics.json
@@ -326,7 +327,7 @@ stages:
       size: 2699
     - path: models
       hash: md5
-      md5: e54544bced31cd36acf2473f3e592687.dir
+      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
       size: 1463734
       nfiles: 7
     - path: reports/metrics.json
@@ -343,8 +344,8 @@ stages:
       size: 2311
     - path: src/fraudshield/serving
       hash: md5
-      md5: d318505e77e6139ed6c2536851308087.dir
-      size: 26819
+      md5: 6ebf387388587d9852fb44bee5783c7a.dir
+      size: 26976
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -367,13 +368,13 @@ stages:
     deps:
     - path: models
       hash: md5
-      md5: e54544bced31cd36acf2473f3e592687.dir
+      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
       size: 1463734
       nfiles: 7
     - path: src/fraudshield/data
       hash: md5
-      md5: dce11c6258e6502a72de618cf53ba3a2.dir
-      size: 5758
+      md5: 391a8d5df04d705be7031aef07bf2835.dir
+      size: 6038
       nfiles: 3
     - path: src/fraudshield/evaluation/metrics.py
       hash: md5
@@ -500,13 +501,13 @@ stages:
     deps:
     - path: models
       hash: md5
-      md5: e54544bced31cd36acf2473f3e592687.dir
+      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
       size: 1463734
       nfiles: 7
     - path: src/fraudshield/data
       hash: md5
-      md5: dce11c6258e6502a72de618cf53ba3a2.dir
-      size: 5758
+      md5: 391a8d5df04d705be7031aef07bf2835.dir
+      size: 6038
       nfiles: 3
     - path: src/fraudshield/features
       hash: md5
@@ -530,12 +531,12 @@ stages:
       nfiles: 4
     - path: src/fraudshield/pipeline/reference.py
       hash: md5
-      md5: a02fa94b920606e747b7b7ef4dfb385a
-      size: 1595
+      md5: 90aa6ecbbb50f32b8d9a2198d59416da
+      size: 1780
     - path: src/fraudshield/serving
       hash: md5
-      md5: d318505e77e6139ed6c2536851308087.dir
-      size: 26819
+      md5: 6ebf387388587d9852fb44bee5783c7a.dir
+      size: 26976
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -583,11 +584,11 @@ stages:
         monitoring.max_flag_rate_ratio: 2.0
         monitoring.max_unparseable_increase: 0.05
         monitoring.min_samples: 1000
+        monitoring.normal: {}
         monitoring.psi_alert: 0.25
         monitoring.psi_warn: 0.1
         monitoring.reference:
           seed: 7
-          start: '2025-07-31'
           days: 14
           n_rows: 2500
         monitoring.report_only:
@@ -595,6 +596,7 @@ stages:
         - user_max_amount
         - user_std_amount
         monitoring.window: 1000
+        retraining.periods: []
     outs:
     - path: reports/reference.json
       hash: md5
@@ -606,7 +608,7 @@ stages:
     deps:
     - path: models
       hash: md5
-      md5: e54544bced31cd36acf2473f3e592687.dir
+      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
       size: 1463734
       nfiles: 7
     - path: reports/reference.json
@@ -615,8 +617,8 @@ stages:
       size: 10066
     - path: src/fraudshield/data
       hash: md5
-      md5: dce11c6258e6502a72de618cf53ba3a2.dir
-      size: 5758
+      md5: 391a8d5df04d705be7031aef07bf2835.dir
+      size: 6038
       nfiles: 3
     - path: src/fraudshield/features
       hash: md5
@@ -640,12 +642,12 @@ stages:
       nfiles: 4
     - path: src/fraudshield/pipeline/drift_drill.py
       hash: md5
-      md5: 80a765c8a55adc6f4033d6c86e741f0e
-      size: 4728
+      md5: 392595e805e0c65348112ad0c2a4d7cf
+      size: 5104
     - path: src/fraudshield/serving
       hash: md5
-      md5: d318505e77e6139ed6c2536851308087.dir
-      size: 26819
+      md5: 6ebf387388587d9852fb44bee5783c7a.dir
+      size: 26976
       nfiles: 6
     params:
       configs/pipeline.yaml:
@@ -691,9 +693,9 @@ stages:
           - £
           - $
         monitoring:
+          normal: {}
           reference:
             seed: 7
-            start: '2025-07-31'
             days: 14
             n_rows: 2500
           window: 1000
@@ -741,6 +743,7 @@ stages:
                 - Galaxy S24
               broken_log_format:
                 malformed_rate: 0.4
+        retraining.periods: []
     outs:
     - path: reports/drift_drill.json
       hash: md5
@@ -752,13 +755,13 @@ stages:
     deps:
     - path: models
       hash: md5
-      md5: e54544bced31cd36acf2473f3e592687.dir
+      md5: ac9897e13f5a536c6ab2faf170bd1adf.dir
       size: 1463734
       nfiles: 7
     - path: src/fraudshield/data
       hash: md5
-      md5: dce11c6258e6502a72de618cf53ba3a2.dir
-      size: 5758
+      md5: 391a8d5df04d705be7031aef07bf2835.dir
+      size: 6038
       nfiles: 3
     - path: src/fraudshield/evaluation/metrics.py
       hash: md5
@@ -785,13 +788,13 @@ stages:
       nfiles: 2
     - path: src/fraudshield/pipeline/retrain_drill.py
       hash: md5
-      md5: 9cd494bc7467dc5969ac6cdedbd0dea0
-      size: 4645
+      md5: dcad450363386c0894e7079bdf2a617f
+      size: 5266
     - path: src/fraudshield/retraining
       hash: md5
-      md5: 717b0d51e44349f038da4d282f86e146.dir
-      size: 8444
-      nfiles: 2
+      md5: 376a04ce91caff820a237115d06b1779.dir
+      size: 18565
+      nfiles: 3
     params:
       configs/pipeline.yaml:
         gates.metrics:
@@ -852,19 +855,19 @@ stages:
             - Galaxy S24
           broken_log_format:
             malformed_rate: 0.4
+        monitoring.normal: {}
         retraining:
           holdout_days: 4
+          periods: []
           min_holdout_frauds: 15
           max_base_pr_auc_drop: 0.01
           drill:
             recent:
               seed: 9
-              start: '2025-07-31'
               days: 14
               n_rows: 2500
             future:
               seed: 10
-              start: '2025-08-14'
               days: 14
               n_rows: 2500
             expect:
@@ -878,5 +881,5 @@ stages:
     outs:
     - path: reports/retrain_drill.json
       hash: md5
-      md5: 9c815079034fcc87ff068caaf3b17ebc
-      size: 10661
+      md5: 4bc5aeca81e9f7b1ea146a5885bdb6af
+      size: 10675

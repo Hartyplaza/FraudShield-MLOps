@@ -1,6 +1,6 @@
 # Continuous integration: runs on every push to main and every pull request.
 #
-#   lint-test   ruff + the full test suite
+#   lint-test   ruff, a check that dvc.lock is not behind the code, the test suite
 #   reproduce   rebuilds the whole pipeline from config on a clean machine and
 #               checks the results match the ones committed in reports/
 #   docker      builds both images, trains inside the container (up to the
@@ -40,6 +40,8 @@ jobs:
         run: uv sync --all-extras --frozen
       - name: Lint
         run: uv run ruff check src tests
+      - name: dvc.lock matches the code and config
+        run: uv run python -m fraudshield.pipeline.lockcheck
       - name: Test
         run: uv run pytest -q
 

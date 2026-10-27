@@ -34,6 +34,7 @@ import yaml
 from fraudshield.data.generate import generate
 from fraudshield.ingestion.parser import parse_log_line
 from fraudshield.labelling.label_simulator import simulate_labels
+from fraudshield.pipeline.config import normal_traffic, training_end
 
 _connections: dict[str, http.client.HTTPConnection] = {}
 ATTEMPTS = 5
@@ -129,7 +130,7 @@ def main() -> None:
     parser.add_argument("--url", default="http://localhost:8000")
     parser.add_argument("--config", default="configs/pipeline.yaml")
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--start", default="2025-07-31")
+    parser.add_argument("--start", help="first day of the stream (default: the day training data ends)")
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--n-rows", type=int, default=2500)
     parser.add_argument("--every", type=int, default=250, help="print progress every N transactions")
@@ -141,14 +142,15 @@ def main() -> None:
 
     with open(args.config, encoding="utf-8") as f:
         config = yaml.safe_load(f)
-    cfg = {**config["generator"], "seed": args.seed, "start": args.start,
+    start = args.start or training_end(config)
+    cfg = {**normal_traffic(config), "seed": args.seed, "start": start,
            "days": args.days, "n_rows": args.n_rows}
     if args.scenario:
         cfg.update(config["monitoring"]["drill"]["scenarios"][args.scenario])
 
     lines, rejected, labels = build_stream(cfg)
     label = f", scenario {args.scenario}" if args.scenario else ""
-    print(f"Streaming {len(lines)} transactions from {args.start} ({args.days} days, seed {args.seed}{label})")
+    print(f"Streaming {len(lines)} transactions from {start} ({args.days} days, seed {args.seed}{label})")
     print(f"Actual fraud in stream: {int(labels.sum())}; unparseable lines mixed in: {len(rejected)}\n")
 
     tp = fp = fn = 0

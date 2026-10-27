@@ -33,6 +33,7 @@ reports/*
 !reports/reference.json
 !reports/drift_drill.json
 !reports/retrain_drill.json
+!reports/retrain_decision.json
 
 # Testing and tooling
 .pytest_cache/
