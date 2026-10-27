@@ -32,6 +32,7 @@ paths:
   promotions: reports/promotions.jsonl
   reference: reports/reference.json
   drift_drill: reports/drift_drill.json
+  retrain_drill: reports/retrain_drill.json
 
 tracking:
   enabled: true
@@ -103,3 +104,22 @@ monitoring:
       location_missing_50pct: {location_missing_rate: 0.5}
       new_device_models: {devices: [Pixel 9, iPhone 16, Galaxy S24]}
       broken_log_format: {malformed_rate: 0.4}
+
+retraining:
+  # Decide on the latest days of the recent labelled period, never trained on
+  holdout_days: 4
+  # Fewer labelled frauds than this in the holdout: too little evidence to act on
+  min_holdout_frauds: 15
+  # A candidate may trail the champion's PR-AUC on the original test set by at most this
+  max_base_pr_auc_drop: 0.01
+  # Harm and acceptance use the quality gate's limits (gates.metrics.min_recall, min_precision)
+  drill:
+    recent: {seed: 9, start: "2025-07-31", days: 14, n_rows: 2500}
+    future: {seed: 10, start: "2025-08-14", days: 14, n_rows: 2500}
+    # scenario (from monitoring.drill.scenarios, or none) -> the right decision
+    expect:
+      none: keep
+      amounts_x3: retrained
+      new_device_models: keep
+      location_missing_50pct: keep
+      broken_log_format: keep

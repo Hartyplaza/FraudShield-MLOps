@@ -55,13 +55,13 @@ jobs:
           enable-cache: true
       - name: Install (from the lockfile)
         run: uv sync --all-extras --frozen
-      - name: Rebuild the pipeline from scratch (generate -> gate -> seeds -> drift drill)
-        run: uv run dvc repro gate seeds drift_drill
+      - name: Rebuild the pipeline from scratch (generate -> gate -> seeds -> drift and retraining drills)
+        run: uv run dvc repro gate seeds drift_drill retrain_drill
       - name: Results must match the committed ones exactly
         run: |
           git diff --exit-code reports/metrics.json reports/gate.json reports/seeds.json \
-            reports/reference.json reports/drift_drill.json
-          echo "Reproduced: metrics, quality gate, seed results and drift drill are identical to the commit."
+            reports/reference.json reports/drift_drill.json reports/retrain_drill.json
+          echo "Reproduced: metrics, quality gate, seed results and both drills are identical to the commit."
       - name: Keep the reports
         if: always()
         uses: actions/upload-artifact@v4

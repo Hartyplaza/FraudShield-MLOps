@@ -173,3 +173,26 @@ stages:
     metrics:
       - reports/drift_drill.json:
           cache: false
+
+  retrain_drill:
+    cmd: python -m fraudshield.pipeline.retrain_drill --config configs/pipeline.yaml
+    deps:
+      - models
+      - src/fraudshield/retraining
+      - src/fraudshield/pipeline/retrain_drill.py
+      - src/fraudshield/data
+      - src/fraudshield/ingestion
+      - src/fraudshield/labelling
+      - src/fraudshield/features
+      - src/fraudshield/evaluation/metrics.py
+      - src/fraudshield/evaluation/threshold_tuner.py
+    params:
+      - configs/pipeline.yaml:
+          - generator
+          - training
+          - gates.metrics
+          - monitoring.drill.scenarios
+          - retraining
+    metrics:
+      - reports/retrain_drill.json:
+          cache: false

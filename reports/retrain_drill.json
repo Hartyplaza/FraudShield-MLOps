@@ -1,0 +1,445 @@
+{
+  "passed": true,
+  "scenarios": {
+    "none": {
+      "expected": "keep",
+      "decision": "keep",
+      "reason": "no clear harm: champion recall 0.941 (up to 0.990), precision 0.800 (up to 0.919) on recent traffic",
+      "candidates": {
+        "champion": {
+          "threshold": 0.9,
+          "recent": {
+            "pr_auc": 0.9578,
+            "recall": 0.9412,
+            "precision": 0.8,
+            "tp": 16,
+            "fp": 4,
+            "fn": 1,
+            "frauds": 17
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 0.9672,
+            "precision": 0.9077,
+            "tp": 59,
+            "fp": 6,
+            "fn": 2,
+            "frauds": 61
+          }
+        },
+        "recalibrated": {
+          "threshold": 0.79,
+          "recent": {
+            "pr_auc": 0.9578,
+            "recall": 1.0,
+            "precision": 0.7727,
+            "tp": 17,
+            "fp": 5,
+            "fn": 0,
+            "frauds": 17
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 0.9836,
+            "precision": 0.8219,
+            "tp": 60,
+            "fp": 13,
+            "fn": 1,
+            "frauds": 61
+          }
+        },
+        "retrained": {
+          "threshold": 0.85,
+          "recent": {
+            "pr_auc": 0.9773,
+            "recall": 0.8824,
+            "precision": 0.8333,
+            "tp": 15,
+            "fp": 3,
+            "fn": 2,
+            "frauds": 17
+          },
+          "base": {
+            "pr_auc": 0.9837,
+            "recall": 0.9836,
+            "precision": 0.8696,
+            "tp": 60,
+            "fp": 9,
+            "fn": 1,
+            "frauds": 61
+          }
+        }
+      },
+      "future_champion": {
+        "pr_auc": 0.9573,
+        "recall": 0.9714,
+        "precision": 0.8947,
+        "tp": 68,
+        "fp": 8,
+        "fn": 2,
+        "frauds": 70
+      },
+      "future_after_decision": {
+        "pr_auc": 0.9573,
+        "recall": 0.9714,
+        "precision": 0.8947,
+        "tp": 68,
+        "fp": 8,
+        "fn": 2,
+        "frauds": 70
+      }
+    },
+    "amounts_x3": {
+      "expected": "retrained",
+      "decision": "retrained",
+      "reason": "harm: champion recall 0.712 (at most 0.807), precision 1.000 (at most 1.000) on recent traffic; retrained recall 1.000, precision 0.880, and meets the limits on original traffic; rejected first: recalibrated: original-traffic recall 1.000 / precision 0.635",
+      "candidates": {
+        "champion": {
+          "threshold": 0.9,
+          "recent": {
+            "pr_auc": 0.9908,
+            "recall": 0.7121,
+            "precision": 1.0,
+            "tp": 47,
+            "fp": 0,
+            "fn": 19,
+            "frauds": 66
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 0.9672,
+            "precision": 0.9077,
+            "tp": 59,
+            "fp": 6,
+            "fn": 2,
+            "frauds": 61
+          }
+        },
+        "recalibrated": {
+          "threshold": 0.26,
+          "recent": {
+            "pr_auc": 0.9908,
+            "recall": 0.9697,
+            "precision": 0.9014,
+            "tp": 64,
+            "fp": 7,
+            "fn": 2,
+            "frauds": 66
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 1.0,
+            "precision": 0.6354,
+            "tp": 61,
+            "fp": 35,
+            "fn": 0,
+            "frauds": 61
+          }
+        },
+        "retrained": {
+          "threshold": 0.73,
+          "recent": {
+            "pr_auc": 0.9993,
+            "recall": 1.0,
+            "precision": 0.88,
+            "tp": 66,
+            "fp": 9,
+            "fn": 0,
+            "frauds": 66
+          },
+          "base": {
+            "pr_auc": 0.9956,
+            "recall": 1.0,
+            "precision": 0.8714,
+            "tp": 61,
+            "fp": 9,
+            "fn": 0,
+            "frauds": 61
+          }
+        }
+      },
+      "future_champion": {
+        "pr_auc": 0.9876,
+        "recall": 0.7358,
+        "precision": 0.9891,
+        "tp": 181,
+        "fp": 2,
+        "fn": 65,
+        "frauds": 246
+      },
+      "future_after_decision": {
+        "pr_auc": 0.9773,
+        "recall": 1.0,
+        "precision": 0.8693,
+        "tp": 246,
+        "fp": 37,
+        "fn": 0,
+        "frauds": 246
+      }
+    },
+    "new_device_models": {
+      "expected": "keep",
+      "decision": "keep",
+      "reason": "no clear harm: champion recall 0.941 (up to 0.990), precision 0.800 (up to 0.919) on recent traffic",
+      "candidates": {
+        "champion": {
+          "threshold": 0.9,
+          "recent": {
+            "pr_auc": 0.962,
+            "recall": 0.9412,
+            "precision": 0.8,
+            "tp": 16,
+            "fp": 4,
+            "fn": 1,
+            "frauds": 17
+          },
+          "base": {
+            "pr_auc": 0.9923,
+            "recall": 0.9672,
+            "precision": 0.9077,
+            "tp": 59,
+            "fp": 6,
+            "fn": 2,
+            "frauds": 61
+          }
+        },
+        "recalibrated": {
+          "threshold": 0.87,
+          "recent": {
+            "pr_auc": 0.962,
+            "recall": 0.9412,
+            "precision": 0.8,
+            "tp": 16,
+            "fp": 4,
+            "fn": 1,
+            "frauds": 17
+          },
+          "base": {
+            "pr_auc": 0.9923,
+            "recall": 0.9672,
+            "precision": 0.8676,
+            "tp": 59,
+            "fp": 9,
+            "fn": 2,
+            "frauds": 61
+          }
+        },
+        "retrained": {
+          "threshold": 0.88,
+          "recent": {
+            "pr_auc": 0.9631,
+            "recall": 0.8824,
+            "precision": 0.7895,
+            "tp": 15,
+            "fp": 4,
+            "fn": 2,
+            "frauds": 17
+          },
+          "base": {
+            "pr_auc": 0.9836,
+            "recall": 0.9344,
+            "precision": 0.8382,
+            "tp": 57,
+            "fp": 11,
+            "fn": 4,
+            "frauds": 61
+          }
+        }
+      },
+      "future_champion": {
+        "pr_auc": 0.9587,
+        "recall": 0.9692,
+        "precision": 0.8873,
+        "tp": 63,
+        "fp": 8,
+        "fn": 2,
+        "frauds": 65
+      },
+      "future_after_decision": {
+        "pr_auc": 0.9587,
+        "recall": 0.9692,
+        "precision": 0.8873,
+        "tp": 63,
+        "fp": 8,
+        "fn": 2,
+        "frauds": 65
+      }
+    },
+    "location_missing_50pct": {
+      "expected": "keep",
+      "decision": "keep",
+      "reason": "no clear harm: champion recall 0.956 (up to 0.988), precision 0.977 (up to 0.996) on recent traffic",
+      "candidates": {
+        "champion": {
+          "threshold": 0.9,
+          "recent": {
+            "pr_auc": 0.9839,
+            "recall": 0.9556,
+            "precision": 0.9773,
+            "tp": 43,
+            "fp": 1,
+            "fn": 2,
+            "frauds": 45
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 0.9672,
+            "precision": 0.9077,
+            "tp": 59,
+            "fp": 6,
+            "fn": 2,
+            "frauds": 61
+          }
+        },
+        "recalibrated": {
+          "threshold": 0.65,
+          "recent": {
+            "pr_auc": 0.9839,
+            "recall": 1.0,
+            "precision": 0.9375,
+            "tp": 45,
+            "fp": 3,
+            "fn": 0,
+            "frauds": 45
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 1.0,
+            "precision": 0.7531,
+            "tp": 61,
+            "fp": 20,
+            "fn": 0,
+            "frauds": 61
+          }
+        },
+        "retrained": {
+          "threshold": 0.89,
+          "recent": {
+            "pr_auc": 0.9956,
+            "recall": 0.9778,
+            "precision": 0.9362,
+            "tp": 44,
+            "fp": 3,
+            "fn": 1,
+            "frauds": 45
+          },
+          "base": {
+            "pr_auc": 0.9865,
+            "recall": 0.9672,
+            "precision": 0.9365,
+            "tp": 59,
+            "fp": 4,
+            "fn": 2,
+            "frauds": 61
+          }
+        }
+      },
+      "future_champion": {
+        "pr_auc": 0.9546,
+        "recall": 0.9745,
+        "precision": 0.9273,
+        "tp": 153,
+        "fp": 12,
+        "fn": 4,
+        "frauds": 157
+      },
+      "future_after_decision": {
+        "pr_auc": 0.9546,
+        "recall": 0.9745,
+        "precision": 0.9273,
+        "tp": 153,
+        "fp": 12,
+        "fn": 4,
+        "frauds": 157
+      }
+    },
+    "broken_log_format": {
+      "expected": "keep",
+      "decision": "keep",
+      "reason": "no clear harm: champion recall 1.000 (up to 1.000), precision 1.000 (up to 1.000) on recent traffic",
+      "candidates": {
+        "champion": {
+          "threshold": 0.9,
+          "recent": {
+            "pr_auc": 1.0,
+            "recall": 1.0,
+            "precision": 1.0,
+            "tp": 15,
+            "fp": 0,
+            "fn": 0,
+            "frauds": 15
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 0.9672,
+            "precision": 0.9077,
+            "tp": 59,
+            "fp": 6,
+            "fn": 2,
+            "frauds": 61
+          }
+        },
+        "recalibrated": {
+          "threshold": 0.9,
+          "recent": {
+            "pr_auc": 1.0,
+            "recall": 1.0,
+            "precision": 1.0,
+            "tp": 15,
+            "fp": 0,
+            "fn": 0,
+            "frauds": 15
+          },
+          "base": {
+            "pr_auc": 0.9931,
+            "recall": 0.9672,
+            "precision": 0.9077,
+            "tp": 59,
+            "fp": 6,
+            "fn": 2,
+            "frauds": 61
+          }
+        },
+        "retrained": {
+          "threshold": 0.86,
+          "recent": {
+            "pr_auc": 1.0,
+            "recall": 1.0,
+            "precision": 1.0,
+            "tp": 15,
+            "fp": 0,
+            "fn": 0,
+            "frauds": 15
+          },
+          "base": {
+            "pr_auc": 0.9809,
+            "recall": 0.9344,
+            "precision": 0.8507,
+            "tp": 57,
+            "fp": 10,
+            "fn": 4,
+            "frauds": 61
+          }
+        }
+      },
+      "future_champion": {
+        "pr_auc": 0.9945,
+        "recall": 0.9778,
+        "precision": 0.9167,
+        "tp": 44,
+        "fp": 4,
+        "fn": 1,
+        "frauds": 45
+      },
+      "future_after_decision": {
+        "pr_auc": 0.9945,
+        "recall": 0.9778,
+        "precision": 0.9167,
+        "tp": 44,
+        "fp": 4,
+        "fn": 1,
+        "frauds": 45
+      }
+    }
+  }
+}
