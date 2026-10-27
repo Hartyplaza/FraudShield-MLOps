@@ -1,6 +1,12 @@
-"""Retraining proposals: windows that follow the training data, config edits, the lock check."""
+"""Retraining proposals: windows that follow the training data, config edits, the lock check.
 
-import shutil
+These tests must hold whatever retraining has already done to configs/pipeline.yaml,
+so they start from a baseline: the config with no added periods and nothing
+accepted as normal.
+"""
+
+import re
+from pathlib import Path
 
 import pandas as pd
 import yaml
@@ -14,8 +20,18 @@ from fraudshield.pipeline.config import (
 from fraudshield.pipeline.lockcheck import stale
 from fraudshield.retraining.propose import apply, contract_changes, recent_period
 
-CFG = load_config()
+LIVE = load_config()
+CFG = {**LIVE, "retraining": {**LIVE["retraining"], "periods": []},
+       "monitoring": {**LIVE["monitoring"], "normal": {}}}
 AMOUNTS = CFG["monitoring"]["drill"]["scenarios"]["amounts_x3"]
+ORIGINAL_END = "2025-07-31"   # generator: 60 days from 2025-06-01
+
+
+def baseline_text() -> str:
+    """configs/pipeline.yaml as text, with retraining's edits undone."""
+    text = Path("configs/pipeline.yaml").read_text(encoding="utf-8")
+    text = re.sub(r"^  periods:\n(?:    - .*\n)+", "  periods: []\n", text, flags=re.MULTILINE)
+    return re.sub(r"^  normal: .*\n", "  normal: {}\n", text, count=1, flags=re.MULTILINE)
 
 
 def with_period(cfg: dict, period: dict, normal: dict | None = None) -> dict:
@@ -26,7 +42,7 @@ def with_period(cfg: dict, period: dict, normal: dict | None = None) -> dict:
 
 
 def test_after_training_windows_follow_the_training_data():
-    assert training_end(CFG) == "2025-07-31"                 # 60 days from 2025-06-01
+    assert training_end(CFG) == ORIGINAL_END
     extended = with_period(CFG, {"start": "2025-07-31", "days": 30})
     assert training_end(extended) == "2025-08-30"
     assert training_end(extended, plus_days=14) == "2025-09-13"
@@ -57,7 +73,8 @@ def test_contract_change_only_for_the_amount_range():
 
 def test_apply_edits_the_config_and_keeps_comments(tmp_path):
     path = tmp_path / "pipeline.yaml"
-    shutil.copy("configs/pipeline.yaml", path)
+    path.write_text(baseline_text(), encoding="utf-8")
+    assert yaml.safe_load(path.read_text(encoding="utf-8"))["retraining"]["periods"] == []
     first = recent_period(CFG, "amounts_x3")
     done = apply(str(path), CFG, first, "amounts_x3", {"amount_range": [0.01, 15000]})
     text = path.read_text(encoding="utf-8")
